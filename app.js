@@ -1,0 +1,3084 @@
+/* ============================================================
+   INVENTARIO TV – Hotel Hesperia Playa El Agua
+   app.js – Lógica principal
+   ============================================================ */
+
+// ─── STORAGE ────────────────────────────────────────────────
+const DB_TVS  = 'hpa_tvs';
+const DB_MOVS = 'hpa_movimientos';
+
+// Funciones de carga que filtran registros eliminados lógicamente
+function loadTVs()   {
+  const tvs = window.appData.tvs || [];
+  // Admin ve todos, otros usuarios ven solo los no eliminados
+  if (isAdmin()) return tvs;
+  return tvs.filter(t => !t.deleted);
+}
+function loadMovs()  {
+  const movs = window.appData.movimientos || [];
+  if (isAdmin()) return movs;
+  return movs.filter(m => !m.deleted);
+}
+// Función para admin que carga todos (incluyendo eliminados)
+function loadAllTVs()  { return window.appData.tvs || []; }
+function loadAllMovs() { return window.appData.movimientos || []; }
+
+let currentImgFile = null;
+
+// ─── NAVEGACIÓN ─────────────────────────────────────────────
+const pageTitles = {
+  dashboard:    'Panel',
+  inventario:   'Inventario de TVs',
+  movimientos:  'Registrar Movimiento',
+  historial:    'Historial Global',
+  'nuevo-tv':   'Registrar TV'
+};
+
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const page = document.getElementById('page-' + id);
+  if (page) page.classList.add('active');
+  const nav = document.getElementById('nav-' + id);
+  if (nav) nav.classList.add('active');
+  document.getElementById('pageTitle').textContent = pageTitles[id] || id;
+
+  // Habilitar/deshabilitar botón Gestión de Usuarios según la página activa
+  const navUsuarios = document.getElementById('nav-usuarios');
+  if (navUsuarios) {
+    if (id === 'dashboard') {
+      navUsuarios.classList.remove('disabled');
+      navUsuarios.style.pointerEvents = '';
+      navUsuarios.style.opacity = '';
+    } else {
+      navUsuarios.classList.add('disabled');
+      navUsuarios.style.pointerEvents = 'none';
+      navUsuarios.style.opacity = '0.4';
+    }
+  }
+
+  if (id === 'dashboard')   renderDashboard();
+  if (id === 'inventario')  renderInventario();
+  if (id === 'historial')   renderHistorial();
+  if (id === 'movimientos') {
+    populateMovTV();
+    setTimeout(() => {
+      const firstBtn = document.querySelector('.mov-tipo-btn');
+      if (firstBtn) firstBtn.focus();
+    }, 200);
+  }
+  if (id === 'asignar-tv')  renderAsignarTVPage();
+  if (id === 'nuevo-tv' && !document.getElementById('tvId').value) resetFormTV();
+
+  // Cerrar sidebar en móvil
+  if (window.innerWidth <= 768) {
+    document.getElementById('sidebar').classList.remove('open');
+  }
+}
+
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', e => {
+    // Si el enlace tiene un href real (no "#"), permitir la navegación normal
+    if (item.getAttribute('href') && item.getAttribute('href') !== '#') {
+      return; // No prevenir el comportamiento por defecto
+    }
+    e.preventDefault();
+    showPage(item.dataset.page);
+  });
+});
+
+// Navegación por teclado en el menú lateral
+document.addEventListener('keydown', e => {
+  // Ignorar si el usuario está escribiendo en un formulario
+  if (document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+  // Ignorar si el foco está en una fila de tabla (navegación propia de la tabla)
+  if (document.activeElement && document.activeElement.tagName === 'TR' && document.activeElement.hasAttribute('tabindex')) return;
+  // Ignorar si el foco está en una tarjeta de tipo de movimiento (navegación propia)
+  if (document.activeElement && document.activeElement.classList.contains('mov-tipo-btn')) return;
+
+  const navItems = Array.from(document.querySelectorAll('.nav-item'));
+  if (!navItems.length) return;
+
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    
+    let currentIdx = navItems.indexOf(document.activeElement);
+    if (currentIdx === -1) {
+      currentIdx = navItems.findIndex(n => n.classList.contains('active'));
+      if (currentIdx === -1) currentIdx = 0;
+      else if (e.key === 'ArrowDown') currentIdx = (currentIdx + 1) % navItems.length;
+      else currentIdx = (currentIdx - 1 + navItems.length) % navItems.length;
+    } else {
+      if (e.key === 'ArrowDown') {
+        currentIdx = (currentIdx + 1) % navItems.length;
+      } else {
+        currentIdx = (currentIdx - 1 + navItems.length) % navItems.length;
+      }
+    }
+    navItems[currentIdx].focus();
+  }
+  // 'Enter' is handled natively when the <a> element is focused
+});
+
+document.getElementById('sidebarToggle').addEventListener('click', () => {
+  const sb = document.getElementById('sidebar');
+  if (window.innerWidth <= 768) {
+    sb.classList.toggle('open');
+  } else {
+    sb.classList.toggle('collapsed');
+    document.querySelector('.main-wrapper').classList.toggle('expanded');
+  }
+});
+
+// ─── FECHA ACTUAL ────────────────────────────────────────────
+function updateDate() {
+  const now = new Date();
+  document.getElementById('currentDate').textContent =
+    now.toLocaleDateString('es-VE', { weekday:'short', day:'2-digit', month:'short', year:'numeric' });
+}
+updateDate();
+setInterval(updateDate, 60000);
+
+// ─── HELPERS ────────────────────────────────────────────────
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  if (iso === 'desconocida') return 'Fecha y hora desconocida';
+  const d = new Date(iso);
+  return d.toLocaleString('es-VE', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+function fmtDateOnly(iso) {
+  if (!iso) return '—';
+  if (iso === 'desconocida') return 'Fecha desconocida';
+  // Treat "00" or dates starting with "00" as unknown
+  const trimmed = iso.trim();
+  if (trimmed === '00' || trimmed.startsWith('00/')) {
+    return 'Fecha desconocida';
+  }
+  // Accept both ISO (yyyy-mm-dd) and DD/MM/YYYY formats
+  if (trimmed.includes('/')) return trimmed; // already in desired format
+  const parts = trimmed.split('-');
+  if (parts.length === 3) {
+    const [y, m, d] = parts;
+    return `${d}/${m}/${y}`;
+  }
+  return trimmed;
+}
+
+const tipoLabel = {
+  traslado_hab:   '🔀 Traslado habitación',
+  entrada_taller: '🔧 Enviado a taller',
+  retorno_taller: '✅ Retorno de taller',
+  baja:           '❌ Dado de baja',
+  reingreso:      '🔄 Reingreso al servicio',
+  otro:           '📝 Otro'
+};
+
+const estadoBadge = {
+  activo:   '<span class="badge badge-activo">✅ En Habitación</span>',
+  taller:   '<span class="badge badge-taller">🔧 En Taller</span>',
+  traslado: '<span class="badge badge-traslado">🔀 En Traslado</span>',
+  baja:     '<span class="badge badge-baja">❌ Dado de Baja</span>',
+  operativo:   '<span class="badge badge-activo">✅ Operativo</span>',
+  inoperativo: '<span class="badge badge-baja">❌ Inoperativo</span>'
+};
+
+function showToast(msg, type = 'success', duration = 3200) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + type + ' show';
+  setTimeout(() => { t.className = 'toast'; }, duration);
+}
+
+let _lastFocusedElement = null;
+
+function openModal(id) {
+  _lastFocusedElement = document.activeElement;
+  document.getElementById(id).classList.add('open');
+  const modal = document.getElementById(id);
+  const firstFocusable = modal.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+  if (firstFocusable) setTimeout(() => firstFocusable.focus(), 100);
+}
+
+function closeModal(id) { 
+  document.getElementById(id).classList.remove('open'); 
+  if (id === 'modalZoom') {
+    const img = document.getElementById('zoomImgSource');
+    if (img) {
+      img.style.transition = 'transform 0.3s cubic-bezier(.4,0,.2,1)';
+      img.style.transform = 'scale(0.95)';
+    }
+  }
+  if (_lastFocusedElement) { _lastFocusedElement.focus(); _lastFocusedElement = null; }
+}
+
+let currentZoomScale = 1;
+let translateX = 0;
+let translateY = 0;
+let isDragging = false;
+let startX = 0;
+let startY = 0;
+
+function updateZoomTransform() {
+  const img = document.getElementById('zoomImgSource');
+  if (img) {
+    img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentZoomScale})`;
+  }
+}
+
+function zoomImagen(src, title) {
+  if (!src) {
+    showToast('Este televisor no tiene esta imagen registrada.', 'info');
+    return;
+  }
+  const modal = document.getElementById('modalZoom');
+  const img = document.getElementById('zoomImgSource');
+  const titleEl = document.getElementById('zoomImgTitle');
+  
+  img.src = src;
+  titleEl.textContent = title;
+  img.style.transition = 'transform 0.3s cubic-bezier(.4,0,.2,1)';
+  
+  openModal('modalZoom');
+  
+  currentZoomScale = 1;
+  translateX = 0;
+  translateY = 0;
+  setTimeout(() => {
+    updateZoomTransform();
+    setTimeout(() => {
+      if (img) img.style.transition = 'none';
+    }, 300);
+  }, 50);
+}
+
+const zoomImg = document.getElementById('zoomImgSource');
+if (zoomImg) {
+  zoomImg.addEventListener('wheel', function(e) {
+    e.preventDefault();
+    const zoomFactor = 0.1;
+    if (e.deltaY < 0) {
+      currentZoomScale += zoomFactor;
+    } else {
+      currentZoomScale -= zoomFactor;
+    }
+    if (currentZoomScale < 0.5) currentZoomScale = 0.5;
+    if (currentZoomScale > 8) currentZoomScale = 8;
+    updateZoomTransform();
+  });
+
+  zoomImg.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    isDragging = true;
+    startX = e.clientX - translateX;
+    startY = e.clientY - translateY;
+    this.style.cursor = 'grabbing';
+  });
+
+  window.addEventListener('mousemove', function(e) {
+    if (!isDragging) return;
+    translateX = e.clientX - startX;
+    translateY = e.clientY - startY;
+    updateZoomTransform();
+  });
+
+  window.addEventListener('mouseup', function() {
+    if (isDragging) {
+      isDragging = false;
+      if (zoomImg) zoomImg.style.cursor = 'grab';
+    }
+  });
+
+  zoomImg.style.cursor = 'grab';
+
+  // Zoom con teclado: +/- para zoom, flechas para mover
+  document.addEventListener('keydown', function(e) {
+    const modal = document.getElementById('modalZoom');
+    if (!modal || !modal.classList.contains('open')) return;
+    const step = 0.3;
+    if (e.key === '+' || e.key === '=') { e.preventDefault(); currentZoomScale = Math.min(8, currentZoomScale + step); updateZoomTransform(); }
+    else if (e.key === '-' || e.key === '_') { e.preventDefault(); currentZoomScale = Math.max(0.5, currentZoomScale - step); updateZoomTransform(); }
+    else if (e.key === 'ArrowLeft')  { e.preventDefault(); translateX -= 30; updateZoomTransform(); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); translateX += 30; updateZoomTransform(); }
+    else if (e.key === 'ArrowUp')    { e.preventDefault(); translateY -= 30; updateZoomTransform(); }
+    else if (e.key === 'ArrowDown')  { e.preventDefault(); translateY += 30; updateZoomTransform(); }
+    else if (e.key === '0') { e.preventDefault(); currentZoomScale = 1; translateX = 0; translateY = 0; updateZoomTransform(); }
+  });
+}
+
+function adjustMovDestinoHabWidth() {
+  const input = document.getElementById('movDestinoHab');
+  if (input) {
+    const val = input.value || input.placeholder || '';
+    input.style.width = `${Math.max(val.length + 2, 8)}ch`;
+  }
+}
+
+// Cerrar modales al click fuera
+document.querySelectorAll('.modal-overlay').forEach(o => {
+  o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); });
+});
+
+// Cerrar modales con tecla Escape
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    const searchInput = document.getElementById('searchInventario');
+    if (searchInput && document.activeElement === searchInput) {
+      searchInput.value = '';
+      searchInput.blur();
+      applyInventarioFilters();
+      return;
+    }
+    const openModals = document.querySelectorAll('.modal-overlay.open');
+    if (openModals.length) {
+      const last = openModals[openModals.length - 1];
+      last.classList.remove('open');
+      if (last.id === 'modalZoom') {
+        const img = document.getElementById('zoomImgSource');
+        if (img) { img.style.transition = 'transform 0.3s'; img.style.transform = 'scale(0.95)'; }
+      }
+      if (_lastFocusedElement) { _lastFocusedElement.focus(); _lastFocusedElement = null; }
+    }
+  }
+});
+
+// ─── DASHBOARD ───────────────────────────────────────────────
+function renderDashboard() {
+  const tvs  = loadTVs();
+  const movs = loadMovs();
+
+  document.getElementById('stat-total').textContent   = tvs.length;
+  document.getElementById('stat-activos').textContent = tvs.filter(t => t.estado === 'activo').length;
+  document.getElementById('stat-taller').textContent  = tvs.filter(t => t.estado === 'taller').length;
+  document.getElementById('stat-baja').textContent    = tvs.filter(t => t.estado === 'baja').length;
+
+  // Últimos movimientos
+  const elMov = document.getElementById('dash-movimientos');
+  const recientes = [...movs].sort((a, b) => {
+    const fa = a.fecha || '';
+    const fb = b.fecha || '';
+    const aDesconocida = fa.includes('desconocida') || !fa;
+    const bDesconocida = fb.includes('desconocida') || !fb;
+    if (aDesconocida && bDesconocida) return 0;
+    if (aDesconocida) return 1;
+    if (bDesconocida) return -1;
+    return fb.localeCompare(fa);
+  }).slice(0, 20);
+  if (!recientes.length) {
+    elMov.innerHTML = '<p class="empty-state">No hay movimientos registrados aún.</p>';
+  } else {
+    elMov.innerHTML = '<ul class="mini-list">' + recientes.map(m => {
+      const tv = tvs.find(t => String(t.id) === String(m.tvId));
+      const hasActa = tv && (m.actaUrl || m.tipo);
+      const actaIcon = hasActa ? `<span class="ml-acta-icon" title="Ver acta" style="cursor:pointer; margin-left:6px; font-size:0.85rem; opacity:0.7;" onclick="event.stopPropagation(); openActaFromMov(event, '${m.id}')">📄</span>` : '';
+      return `<li tabindex="0" data-tvid="${m.tvId || ''}">
+        <div class="ml-left">
+          <span class="ml-code">${tv ? tv.codigo : m.tvId}</span>
+          <span class="ml-desc-row"><span class="ml-desc">${tipoLabel[m.tipo] || m.tipo}</span>${actaIcon}</span>
+        </div>
+        <span class="ml-date">${fmtDate(m.fecha)}</span>
+      </li>`;
+    }).join('') + '</ul>';
+  }
+
+  // TVs en taller
+  const elTaller = document.getElementById('dash-taller');
+  const enTaller = tvs.filter(t => t.estado === 'taller');
+  const enTallerOrdenado = enTaller.sort((a, b) => {
+    const movA = movs.filter(m => String(m.tvId) === String(a.id));
+    const movB = movs.filter(m => String(m.tvId) === String(b.id));
+    const fechaA = movA.length ? movA[movA.length - 1].fecha : '';
+    const fechaB = movB.length ? movB[movB.length - 1].fecha : '';
+    return fechaB.localeCompare(fechaA);
+  });
+  if (!enTallerOrdenado.length) {
+    elTaller.innerHTML = '<p class="empty-state">Ningún TV en taller actualmente.</p>';
+  } else {
+    elTaller.innerHTML = '<ul class="mini-list">' + enTallerOrdenado.map(t => {
+      const movsTv = movs.filter(m => String(m.tvId) === String(t.id));
+      const ultimoMov = movsTv.length ? movsTv[movsTv.length - 1] : null;
+      const actaIcon = ultimoMov ? `<span class="ml-acta-icon" title="Ver acta" style="cursor:pointer; margin-left:6px; font-size:0.85rem; opacity:0.7;" onclick="event.stopPropagation(); openActaFromMov(event, '${ultimoMov.id}')">📄</span>` : '';
+      return `<li tabindex="0" data-tvid="${t.id}">
+        <div class="ml-left">
+          <span class="ml-code">${t.codigo}</span>
+          <span class="ml-desc-row"><span class="ml-desc">${t.marca} ${t.modelo} – Hab. ${t.habitacion}</span>${actaIcon}</span>
+        </div>
+      </li>`;
+    }).join('') + '</ul>';
+  }
+
+  document.querySelectorAll('#dash-movimientos .mini-list li').forEach(li => {
+    li.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const tvId = li.dataset.tvid;
+        if (tvId) verDetalle(tvId);
+      }
+    });
+  });
+
+  document.querySelectorAll('#dash-taller .mini-list li').forEach(li => {
+    li.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const tvId = li.dataset.tvid;
+        if (tvId) verDetalle(tvId);
+      }
+    });
+  });
+}
+
+// ─── INVENTARIO ──────────────────────────────────────────────
+function renderInventario(filtroEstado = '', filtroUbicacion = '', busqueda = '') {
+  let tvs = loadTVs();
+
+  if (filtroEstado) tvs = tvs.filter(t => t.estado === filtroEstado);
+  if (filtroUbicacion) tvs = tvs.filter(t => t.ubicacion === filtroUbicacion);
+  if (busqueda) {
+    const q = busqueda.toLowerCase();
+    tvs = tvs.filter(t =>
+      [t.codigo, t.ubicacion, t.marca, t.modelo, t.serial]
+        .some(v => v && v.toLowerCase().includes(q))
+    );
+  }
+
+  const tbody = document.getElementById('inventarioBody');
+  if (!tvs.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No se encontraron TVs.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = tvs.map(t => `
+    <tr tabindex="0" ondblclick="verDetalle('${t.id}')" data-id="${t.id}">
+      <td><strong style="color:var(--accent)">${t.codigo}</strong></td>
+      <td>${t.ubicacion === 'Habitacion' ? t.habitacion : (t.ubicacion || '—')}</td>
+      <td>${t.marca}</td>
+      <td>${t.modelo}</td>
+      <td>${t.tamano || '—'}</td>
+      <td style="font-size:0.78rem;color:var(--text-secondary)">${t.serial}</td>
+      <td style="font-size:0.78rem">${fmtDateOnly(t.fechaIngreso)}</td>
+      <td>
+        <div class="actions-cell">
+          <button class="btn btn-assign btn-sm" title="Asignar a habitación" onclick="abrirAsignarHabitacion('${t.id}')" ${t.ubicacion === 'Habitacion' ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>🏨 Asignar</button>
+          <button class="btn btn-secondary btn-sm" onclick="editarTV('${t.id}')" title="Editar datos del TV">✏️ Editar</button>
+          ${hasPermission('cambiar_serial') ? `<button class="btn btn-secondary btn-sm" onclick="abrirCambioSerial('${t.id}')" title="Modificar serial del TV" style="background:rgba(179,110,255,0.15); border-color:rgba(179,110,255,0.4); color:#b36eff;">🔑 Serial</button>` : ''}
+          <button class="btn btn-danger btn-sm" onclick="confirmarEliminar('${t.id}')" title="Ocultar registro">🗑️ Eliminar</button>
+          ${hasPermission('eliminar_fisico_tv') ? `<button class="btn btn-danger btn-sm" onclick="confirmarEliminacionFisica('${t.id}')" title="Eliminar permanentemente de la BD" style="background:rgba(255,77,109,0.2); border-color:rgba(255,77,109,0.5);">💀 Borrar</button>` : ''}
+        </div>
+      </td>
+    </tr>
+  `).join('');
+
+  // Add keyboard navigation and click-selection for rows
+  const rows = document.querySelectorAll('#inventarioBody tr');
+
+  function selectRow(row) {
+    rows.forEach(r => r.classList.remove('tr-selected'));
+    row.classList.add('tr-selected');
+    row.focus();
+  }
+
+  rows.forEach((row, idx) => {
+    // Selección por click
+    row.addEventListener('click', () => selectRow(row));
+
+    row.addEventListener('keydown', e => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const next = rows[idx + 1] || rows[0];
+        selectRow(next);
+        next.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prev = rows[idx - 1] || rows[rows.length - 1];
+        selectRow(prev);
+        prev.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (row.dataset.id) verDetalle(row.dataset.id);
+      } else if (e.key === 'Delete') {
+        e.preventDefault();
+        const delBtn = row.querySelector('button[title="Eliminar este TV"]');
+        if (delBtn) delBtn.click();
+      } else if (e.key === 'Escape') {
+        rows.forEach(r => r.classList.remove('tr-selected'));
+        row.blur();
+      }
+    });
+  });
+  // Auto-select and focus first row for immediate keyboard navigation
+  if (rows.length) selectRow(rows[0]);
+}
+
+// Filtros de inventario
+document.getElementById('searchInventario').addEventListener('input', applyInventarioFilters);
+document.getElementById('filterEstado').addEventListener('change', applyInventarioFilters);
+const filterUbicacion = document.getElementById('filterUbicacion');
+if (filterUbicacion) {
+  filterUbicacion.addEventListener('change', applyInventarioFilters);
+}
+
+function applyInventarioFilters() {
+  renderInventario(
+    document.getElementById('filterEstado').value,
+    filterUbicacion ? filterUbicacion.value : '',
+    document.getElementById('searchInventario').value
+  );
+}
+
+// ─── VER DETALLE ─────────────────────────────────────────────
+function verDetalle(id) {
+  const tvs  = loadTVs();
+  const movs = loadMovs();
+  const tv   = tvs.find(t => String(t.id) === String(id));
+  if (!tv) return;
+
+  const historial = movs.filter(m => String(m.tvId) === String(id))
+    .sort((a,b) => b.fecha.localeCompare(a.fecha));
+
+  document.getElementById('modalDetalleTitle').textContent = '📺 Control de TV – Hesperia Playa El Agua';
+
+  const ubiMostrar = tv.ubicacion === 'Habitacion'
+    ? (tv.habitacion || tv.piso || 'Habitación')
+    : (tv.ubicacion || '—');
+
+  const fields = [
+    ['Código',         tv.codigo || '—'],
+    ['Marca',          tv.marca || '—'],
+    ['Modelo',         tv.modelo || '—'],
+    ['Serial',         tv.serial || '—'],
+    ['Tamaño',         tv.tamano || '—'],
+    ['Tipo Panel',     tv.tipo || '—'],
+    ['Resolución',     tv.resolucion || '—'],
+    ['Smart TV',       tv.smarttv === 'si' ? 'Sí' : 'No'],
+    ['Ubicación',      ubiMostrar],
+    ['Estado',         tv.estado],
+    ['Observaciones',  tv.observaciones || '—'],
+  ];
+
+  const imgsHTML = `
+    <div class="detail-images-section">
+      <h4>📷 Foto de Etiqueta (Trasera) <span style="font-size:0.75rem;font-weight:normal;color:var(--text-secondary);margin-left:8px;">(Doble clic en la imagen para ampliar 🔍)</span></h4>
+      <div class="detail-images-grid" style="grid-template-columns: 1fr; max-width: 320px; margin: 0 auto;">
+        <div class="detail-image-card" title="Foto de Etiqueta - Doble clic para zoom" ondblclick="zoomImagen('${tv.imgTrasera || ''}', 'Foto de Etiqueta (Trasera) - ${tv.codigo}')">
+          <span class="dic-label">Foto de Etiqueta (Trasera)</span>
+          <div class="dic-preview ${!tv.imgTrasera ? 'no-image' : ''}">
+            ${tv.imgTrasera 
+              ? `<img src="${tv.imgTrasera}" alt="Etiqueta" />` 
+              : `<div class="dic-placeholder">
+                  <span class="dic-icon">🏷️</span>
+                  <span>Sin foto de etiqueta</span>
+                 </div>`
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const histHTML = historial.length
+    ? '<div class="historial-timeline">' + historial.map(m => `
+        <div class="ht-item tipo-${m.tipo}">
+          <span class="ht-icon">${tipoIcon(m.tipo)}</span>
+          <div class="ht-content">
+            <div class="ht-head">
+              <span class="ht-tipo">${tipoLabel[m.tipo] || m.tipo}</span>
+              <span class="ht-fecha">${fmtDate(m.fecha)}</span>
+            </div>
+            <div class="ht-motivo"><strong>Motivo:</strong> ${m.motivo}</div>
+            ${m.habDestino ? `<div class="ht-resp">→ Hab. ${m.habDestino}</div>` : ''}
+            <div class="ht-resp">Responsable: ${m.responsable}</div>
+            ${m.observaciones ? `<div class="ht-resp">${m.observaciones}</div>` : ''}
+          </div>
+        </div>`).join('') + '</div>'
+    : '<p class="empty-state">Sin movimientos registrados.</p>';
+
+  document.getElementById('modalDetalleBody').innerHTML = `
+    <div style="display:flex; justify-content:flex-end; margin-bottom:1rem;">
+      <button type="button" onclick="imprimirDetalleTV()" style="display:flex; align-items:center; gap:6px; background:#10b981; color:#fff; border:none; border-radius:8px; padding:10px 20px; font-size:0.9rem; font-weight:600; cursor:pointer;">🖨️ Imprimir</button>
+    </div>
+    <div class="detail-grid">
+      ${fields.map(([l,v]) => `<div class="detail-item">
+        <span class="di-label">${l}</span>
+        <span class="di-value">${l === 'Estado' ? (estadoBadge[v] || v) : v}</span>
+      </div>`).join('')}
+    </div>
+    ${imgsHTML}
+    <div class="historial-section">
+      <h4>📜 Historial de Movimientos (${historial.length})</h4>
+      ${histHTML}
+    </div>`;
+
+  openModal('modalDetalle');
+}
+
+function tipoIcon(tipo) {
+  const icons = { traslado_hab:'🔀', entrada_taller:'🔧', retorno_taller:'✅',
+                  baja:'❌', reingreso:'🔄', otro:'📝' };
+  return icons[tipo] || '📝';
+}
+
+function imprimirDetalleTV() {
+  const body = document.getElementById('modalDetalleBody');
+  if (!body) return;
+  const printWin = window.open('', '_blank', 'width=800,height=600');
+  printWin.document.write(`<!DOCTYPE html><html><head><title>Control de TV</title>
+    <style>
+      body { font-family: Arial, sans-serif; padding: 20px; color: #1a202c; }
+      .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+      .detail-item { border-bottom: 1px solid #e2e8f0; padding: 6px 0; }
+      .di-label { font-size: 0.75rem; text-transform: uppercase; color: #718096; display: block; font-weight: 600; }
+      .di-value { font-size: 0.95rem; color: #2d3748; }
+      .detail-images-section { margin: 20px 0; text-align: center; }
+      .detail-images-section img { max-width: 100%; max-height: 300px; }
+      .historial-section { margin-top: 20px; }
+      .historial-section h4 { border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 10px; }
+      .ht-item { padding: 8px 0; border-bottom: 1px solid #f7fafc; }
+      .ht-head { display: flex; justify-content: space-between; }
+      .ht-tipo { font-weight: 600; }
+      .ht-fecha { color: #718096; font-size: 0.8rem; }
+      .ht-motivo { color: #4a5568; margin: 4px 0; }
+      .ht-resp { color: #718096; font-size: 0.85rem; }
+      .btn-print { display: none; }
+      @media print { .btn-print { display: none; } }
+    </style>
+  </head><body>
+    <div style="text-align:center; margin-bottom:16px; font-size:14px; color:#718096;">Hesperia Playa El Agua</div>
+    ${body.innerHTML}
+  </body></html>`);
+  printWin.document.close();
+  setTimeout(() => { printWin.print(); }, 500);
+}
+
+// ─── ELIMINAR TV (ELIMINACIÓN LÓGICA) ─────────────────────
+let _pendingDeleteId = null;
+
+function confirmarEliminar(id) {
+  _pendingDeleteId = id;
+  openModal('modalConfirm');
+}
+
+document.getElementById('btnConfirmDelete').addEventListener('click', async () => {
+  if (!_pendingDeleteId) return;
+  
+  const btn = document.getElementById('btnConfirmDelete');
+  const prevText = btn.textContent;
+  btn.textContent = 'Eliminando...';
+  btn.disabled = true;
+
+  try {
+    // Eliminación lógica: marcar como eliminado
+    await db.collection('tvs').doc(_pendingDeleteId).update({
+      deleted: true,
+      deletedAt: new Date().toISOString(),
+      deletedBy: window.currentUser ? window.currentUser.uid : 'unknown'
+    });
+    
+    // También marcar movimientos como eliminados lógicamente
+    const movsToDelete = loadMovs().filter(m => String(m.tvId) === String(_pendingDeleteId) && !m.deleted);
+    if (movsToDelete.length > 0) {
+      const batch = db.batch();
+      movsToDelete.forEach(m => {
+        batch.update(db.collection('movimientos').doc(m.id), {
+          deleted: true,
+          deletedAt: new Date().toISOString(),
+          deletedBy: window.currentUser ? window.currentUser.uid : 'unknown'
+        });
+      });
+      await batch.commit();
+    }
+
+    _pendingDeleteId = null;
+    closeModal('modalConfirm');
+    showToast('TV eliminado correctamente (registro oculto).', 'success');
+  } catch (e) {
+    console.error(e);
+    showToast('Error al eliminar: ' + e.message, 'error');
+  } finally {
+    btn.textContent = prevText;
+    btn.disabled = false;
+  }
+});
+
+// Eliminación física (requiere permiso)
+let _pendingPhysicalDeleteId = null;
+function confirmarEliminacionFisica(id) {
+  if (!hasPermission('eliminar_fisico_tv')) {
+    showToast('No tienes permiso para realizar eliminación física.', 'error');
+    return;
+  }
+  _pendingPhysicalDeleteId = id;
+  openModal('modalPhysicalDelete');
+}
+
+document.getElementById('btnConfirmPhysicalDelete').addEventListener('click', async () => {
+  if (!_pendingPhysicalDeleteId) return;
+  
+  const btn = document.getElementById('btnConfirmPhysicalDelete');
+  const prevText = btn.textContent;
+  btn.textContent = 'Eliminando...';
+  btn.disabled = true;
+
+  try {
+    // Eliminar físicamente el TV
+    await db.collection('tvs').doc(_pendingPhysicalDeleteId).delete();
+    
+    // Eliminar físicamente sus movimientos
+    const movsToDelete = loadMovs().filter(m => String(m.tvId) === String(_pendingPhysicalDeleteId));
+    if (movsToDelete.length > 0) {
+      const batch = db.batch();
+      movsToDelete.forEach(m => {
+        batch.delete(db.collection('movimientos').doc(m.id));
+      });
+      await batch.commit();
+    }
+
+    _pendingPhysicalDeleteId = null;
+    closeModal('modalPhysicalDelete');
+    showToast('TV eliminado permanentemente de la base de datos.', 'success');
+  } catch (e) {
+    console.error(e);
+    showToast('Error al eliminar: ' + e.message, 'error');
+  } finally {
+    btn.textContent = prevText;
+    btn.disabled = false;
+  }
+});
+
+// ─── ACCIONES DE ADMIN ─────────────────────────────────────
+
+// Verificar si el usuario actual es admin
+function isAdmin() {
+  return window.currentUser && window.currentUser.role === 'admin';
+}
+
+// Eliminar un movimiento individual (ELIMINACIÓN LÓGICA)
+let _pendingDeleteMovId = null;
+function confirmarEliminarMovimiento(movId) {
+  _pendingDeleteMovId = movId;
+  openModal('modalConfirmMov');
+}
+
+function setupDeleteMovListener() {
+  const btn = document.getElementById('btnConfirmDeleteMov');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    if (!_pendingDeleteMovId) return;
+    const prevText = btn.textContent;
+    btn.textContent = 'Eliminando...';
+    btn.disabled = true;
+    try {
+      // Eliminación lógica
+      await db.collection('movimientos').doc(_pendingDeleteMovId).update({
+        deleted: true,
+        deletedAt: new Date().toISOString(),
+        deletedBy: window.currentUser ? window.currentUser.uid : 'unknown'
+      });
+      _pendingDeleteMovId = null;
+      closeModal('modalConfirmMov');
+      showToast('Movimiento eliminado correctamente (registro oculto).', 'success');
+    } catch (e) {
+      console.error(e);
+      showToast('Error al eliminar: ' + e.message, 'error');
+    } finally {
+      btn.textContent = prevText;
+      btn.disabled = false;
+    }
+  });
+}
+setupDeleteMovListener();
+
+// Eliminar un movimiento individual (ELIMINACIÓN FÍSICA - Admin)
+function confirmarEliminacionFisicaMovimiento(movId) {
+  if (!hasPermission('eliminar_fisico_movimiento')) {
+    showToast('No tienes permiso para eliminar movimientos permanentemente.', 'error');
+    return;
+  }
+  const mov = loadMovs().find(m => String(m.id) === String(movId));
+  if (!mov) return;
+  if (!confirm(`⚠️ ELIMINACIÓN FÍSICA\n\n¿Eliminar permanentemente este movimiento?\n\nTipo: ${mov.tipo}\nFecha: ${mov.fecha}\nResponsable: ${mov.responsable}\n\nEsta acción no se puede deshacer.`)) return;
+  db.collection('movimientos').doc(movId).delete()
+    .then(() => {
+      showToast('Movimiento eliminado permanentemente.', 'success');
+      window.appData.movimientos = window.appData.movimientos.filter(m => String(m.id) !== String(movId));
+      renderHistorial();
+    })
+    .catch(e => showToast('Error: ' + e.message, 'error'));
+}
+
+// Eliminar acta de un movimiento (ELIMINACIÓN FÍSICA - Admin)
+function confirmarEliminarActaMovimiento(movId) {
+  if (!hasPermission('eliminar_fisico_acta')) {
+    showToast('No tienes permiso para eliminar actas permanentemente.', 'error');
+    return;
+  }
+  const mov = loadMovs().find(m => String(m.id) === String(movId));
+  if (!mov || !mov.actaUrl) return;
+  if (!confirm('¿Eliminar el acta de este movimiento?\n\nEsta acción no se puede deshacer.')) return;
+  db.collection('movimientos').doc(movId).update({ actaUrl: firebase.firestore.FieldValue.delete() })
+    .then(() => {
+      showToast('Acta eliminada correctamente.', 'success');
+      mov.actaUrl = null;
+      renderHistorial();
+    })
+    .catch(e => showToast('Error: ' + e.message, 'error'));
+}
+
+// Modificar serial de TV
+let _pendingChangeSerialId = null;
+function abrirCambioSerial(tvId) {
+  const tv = loadTVs().find(t => String(t.id) === String(tvId));
+  if (!tv) return;
+  _pendingChangeSerialId = tvId;
+  document.getElementById('serialOldValue').textContent = tv.serial;
+  document.getElementById('serialNewValue').value = '';
+  openModal('modalChangeSerial');
+}
+
+function setupChangeSerialListener() {
+  const btn = document.getElementById('btnConfirmSerial');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    const newSerial = document.getElementById('serialNewValue').value.trim();
+    if (!newSerial) { showToast('Ingrese el nuevo serial.', 'error'); return; }
+    if (!_pendingChangeSerialId) return;
+    const prevText = btn.textContent;
+    btn.textContent = 'Cambiando...';
+    btn.disabled = true;
+    try {
+      await db.collection('tvs').doc(_pendingChangeSerialId).update({ serial: newSerial });
+      _pendingChangeSerialId = null;
+      closeModal('modalChangeSerial');
+      showToast('Serial actualizado correctamente.', 'success');
+    } catch (e) {
+      console.error(e);
+      showToast('Error al cambiar serial: ' + e.message, 'error');
+    } finally {
+      btn.textContent = prevText;
+      btn.disabled = false;
+    }
+  });
+}
+setupChangeSerialListener();
+
+// Eliminar TODOS los datos (solo admin)
+function confirmarEliminarTodo() {
+  openModal('modalDeleteAll');
+}
+
+function setupDeleteAllListener() {
+  const btn = document.getElementById('btnConfirmDeleteAll');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    const confirmText = document.getElementById('deleteAllConfirmText').value.trim();
+    if (confirmText !== 'ELIMINAR') {
+      showToast('Debe escribir "ELIMINAR" para confirmar.', 'error');
+      return;
+    }
+    const prevText = btn.textContent;
+    btn.textContent = 'Eliminando todo...';
+    btn.disabled = true;
+    try {
+      // Borrar tvs
+      const tvsSnap = await db.collection('tvs').get();
+      for (const doc of tvsSnap.docs) { await doc.ref.delete(); }
+      // Borrar movimientos
+      const movsSnap = await db.collection('movimientos').get();
+      for (const doc of movsSnap.docs) { await doc.ref.delete(); }
+      // Borrar config
+      const configSnap = await db.collection('config').get();
+      for (const doc of configSnap.docs) { await doc.ref.delete(); }
+      // Borrar imágenes de actas en Storage
+      try {
+        const actasRef = storage.ref('actas');
+        const listResult = await actasRef.listAll();
+        for (const item of listResult.items) { await item.delete(); }
+      } catch (e) { /* sin imágenes */ }
+
+      closeModal('modalDeleteAll');
+      showToast('Todos los datos han sido eliminados.', 'success');
+    } catch (e) {
+      console.error(e);
+      showToast('Error al eliminar: ' + e.message, 'error');
+    } finally {
+      btn.textContent = prevText;
+      btn.disabled = false;
+    }
+  });
+}
+setupDeleteAllListener();
+
+// ─── FORMULARIO TV ───────────────────────────────────────────
+function generarCodigoTV() {
+  const tvs = loadTVs();
+  let max = 0;
+  tvs.forEach(t => {
+    if (t.codigo && t.codigo.toUpperCase().startsWith('HPA-')) {
+      const num = parseInt(t.codigo.split('-')[1], 10);
+      if (!isNaN(num) && num > max) max = num;
+    }
+  });
+  return 'HPA-' + String(max + 1).padStart(3, '0');
+}
+
+let currentImgTrasera = '';
+
+const DB_UBICACIONES = 'hpa_ubicaciones';
+function loadUbicaciones() { return window.appData?.metadata?.ubicaciones || []; }
+async function saveUbicaciones(d) { await db.collection('config').doc('metadata').update({ ubicaciones: d }); }
+
+function renderUbicaciones() {
+  const sel = document.getElementById('tvUbicacion');
+  if (!sel) return;
+  const custom = loadUbicaciones();
+  sel.innerHTML = `
+    <option value="">-- Seleccionar --</option>
+    <option value="Almacen">Almacén</option>
+    <option value="Taller">Taller</option>
+    <option value="Habitacion">Habitación</option>
+    <option value="Sala de Juntas">Sala de Juntas</option>
+    ${custom.map(u => `<option value="${u}">${u}</option>`).join('')}
+    <option value="otro">Otro (Especifique)</option>
+  `;
+}
+
+const DB_MARCAS = 'hpa_marcas';
+function loadMarcas() { return window.appData?.metadata?.marcas || []; }
+async function saveMarcas(d) { await db.collection('config').doc('metadata').update({ marcas: d }); }
+
+function renderMarcas() {
+  const sel = document.getElementById('tvMarca');
+  if (!sel) return;
+  const custom = loadMarcas();
+  sel.innerHTML = `
+    <option value="">-- Seleccionar --</option>
+    <option value="LG">LG</option>
+    <option value="Samsung">Samsung</option>
+    <option value="Sony">Sony</option>
+    <option value="Toshiba">Toshiba</option>
+    ${custom.map(m => `<option value="${m}">${m}</option>`).join('')}
+    <option value="otro">Otro (Especifique)</option>
+  `;
+}
+
+function readImage(input, previewId, callback) {
+  if (input.files && input.files[0]) {
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const img = new Image();
+      img.onload = function() {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 800;
+        const MAX_HEIGHT = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Comprimir a JPEG al 60% de calidad para no saturar Firestore
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+        
+        document.getElementById(previewId).innerHTML = `<img src="${dataUrl}" style="max-width:100%;max-height:250px;border-radius:4px;" />`;
+        const label = document.getElementById('labelTrasera');
+        if (label) label.classList.add('has-image');
+        
+        callback(dataUrl);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+function resetFormTV() {
+  document.getElementById('tvId').value = '';
+  document.getElementById('formTV').reset();
+  document.getElementById('tvSerial').disabled = false;
+  document.getElementById('formTVTitle').textContent = '📺 Registrar Nuevo TV';
+  document.getElementById('btnGuardarTV').textContent = '💾 Guardar TV';
+  // Fecha de ingreso = hoy en formato DD/MM/YYYY
+  const today = new Date();
+  document.getElementById('tvFechaIngreso').value = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+  document.getElementById('tvCodigo').value = generarCodigoTV();
+  
+  renderUbicaciones();
+  document.getElementById('tvUbicacion').value = 'Almacen';
+  document.getElementById('grpUbicacionOtro').style.display = 'none';
+  document.getElementById('tvUbicacionOtro').value = '';
+  document.getElementById('grpTvHabitacion').style.display = 'none';
+  document.getElementById('tvHabitacion').value = '';
+  
+  renderMarcas();
+  document.getElementById('tvMarca').value = '';
+  
+  currentImgTrasera = '';
+  currentImgFile = null;
+  document.getElementById('previewTrasera').innerHTML = '';
+  document.getElementById('tvImagenTrasera').value = '';
+  const label = document.getElementById('labelTrasera');
+  if (label) label.classList.remove('has-image');
+}
+
+document.getElementById('tvUbicacion').addEventListener('change', function() {
+  document.getElementById('grpUbicacionOtro').style.display = this.value === 'otro' ? '' : 'none';
+  document.getElementById('grpTvHabitacion').style.display = (this.value === 'Habitacion' || this.value === 'Habitación') ? '' : 'none';
+});
+
+document.getElementById('btnClearFechaIngreso').addEventListener('click', function() {
+  document.getElementById('tvFechaIngreso').value = '00/00/0000';
+  document.getElementById('tvUbicacion').focus();
+});
+
+function clearFieldHighlight(el) {
+  el.style.borderColor = '';
+  el.style.boxShadow = '';
+}
+['tvCodigo','tvMarca','tvModelo','tvSerial','tvUbicacion','tvUbicacionOtro'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) {
+    el.addEventListener('input', () => clearFieldHighlight(el));
+    el.addEventListener('change', () => clearFieldHighlight(el));
+  }
+});
+
+document.getElementById('tvMarca').addEventListener('change', async function() {
+  if (this.value === 'otro') {
+    const nuevaMarca = prompt('Ingrese la nueva Marca:');
+    if (nuevaMarca && nuevaMarca.trim()) {
+      const marcaTrimmed = nuevaMarca.trim();
+      const custom = loadMarcas();
+      if (!custom.includes(marcaTrimmed)) {
+        custom.push(marcaTrimmed);
+        await saveMarcas(custom);
+      }
+      renderMarcas();
+      this.value = marcaTrimmed;
+    } else {
+      this.value = '';
+    }
+  }
+});
+
+function getRoomsForArea(area) {
+  const rooms = [];
+  const val = (area || '').toLowerCase();
+  
+  if (val.includes('premium')) {
+    const match = val.match(/\d+/);
+    if (match) {
+      const prefix = match[0];
+      for (let i = 1; i <= 29; i++) {
+        if (i === 9 || i === 10 || i === 20) continue;
+        rooms.push(`${prefix}${i.toString().padStart(2, '0')}`);
+      }
+    }
+  } else if (val.includes('anillo')) {
+    let prefix = '';
+    if (val.includes('1')) prefix = '50';
+    else if (val.includes('2')) prefix = '51';
+    else if (val.includes('3')) prefix = '52';
+    
+    if (prefix) {
+      for (let i = 1; i <= 32; i++) {
+        rooms.push(`${prefix}${i.toString().padStart(2, '0')}`);
+      }
+    }
+  }
+  return rooms;
+}
+
+function seleccionarReemplazo(destino) {
+  document.querySelectorAll('#modalReemplazo .btn').forEach(b => b.style.borderColor = '');
+  const btn = event.currentTarget;
+  btn.style.borderColor = 'var(--accent)';
+  window._reemplazoSeleccion = destino;
+  document.getElementById('reemplazoOtroGroup').style.display = destino === 'Otro' ? '' : 'none';
+}
+
+function confirmarReemplazo() {
+  let destino = window._reemplazoSeleccion;
+  if (!destino) { showToast('Selecciona un destino.', 'error'); return; }
+  if (destino === 'Otro') {
+    destino = document.getElementById('reemplazoOtroInput').value.trim();
+    if (!destino) { showToast('Especifica el destino.', 'error'); return; }
+  }
+  closeModal('modalReemplazo');
+  if (window._tvReemplazoData) {
+    window._tvReemplazo = { ...window._tvReemplazoData, destino };
+  }
+  if (window._resolveReemplazo) {
+    window._resolveReemplazo(destino);
+    window._resolveReemplazo = null;
+  }
+}
+
+function cancelarReemplazo() {
+  closeModal('modalReemplazo');
+  if (window._resolveReemplazo) {
+    window._resolveReemplazo(null);
+    window._resolveReemplazo = null;
+  }
+}
+
+function isValidRoom(room) {
+  const validRooms = [
+    ...getRoomsForArea('Premium 68'),
+    ...getRoomsForArea('Premium 69'),
+    ...getRoomsForArea('Anillo 1'),
+    ...getRoomsForArea('Anillo 2'),
+    ...getRoomsForArea('Anillo 3')
+  ];
+  return validRooms.includes(room);
+}
+
+function toggleAsignarHabNumero(area) {
+  const grp = document.getElementById('grpAsignarHabNumero');
+  const selHab = document.getElementById('asignarHabNumero');
+  if (!grp || !selHab) return;
+  const val = (area || '').toLowerCase();
+  
+  if (val.includes('premium') || val.includes('anillo')) {
+    grp.style.display = '';
+    selHab.disabled = false;
+    
+    const currentVal = selHab.value;
+    const rooms = getRoomsForArea(area);
+    
+    selHab.innerHTML = '<option value="">-- Seleccionar Habitación --</option>' + 
+      rooms.map(r => `<option value="${r}">${r}</option>`).join('');
+      
+    if (currentVal) {
+      if (!rooms.includes(currentVal)) {
+        selHab.insertAdjacentHTML('beforeend', `<option value="${currentVal}">${currentVal}</option>`);
+      }
+      selHab.value = currentVal;
+    }
+  } else {
+    grp.style.display = 'none';
+    selHab.innerHTML = '<option value="">-- Seleccionar Habitación --</option>';
+  }
+}
+
+document.getElementById('asignarArea').addEventListener('change', function() {
+  if (this.value === 'otro') {
+    const nuevaArea = prompt('Ingrese el nombre de la nueva Área:');
+    if (nuevaArea && nuevaArea.trim()) {
+      const areaTrimmed = nuevaArea.trim();
+      const custom = loadAreas();
+      if (!custom.includes(areaTrimmed)) {
+        custom.push(areaTrimmed);
+        saveAreas(custom);
+      }
+      renderAsignarAreas();
+      this.value = areaTrimmed;
+      toggleAsignarHabNumero(areaTrimmed);
+    } else {
+      this.value = '';
+      toggleAsignarHabNumero('');
+    }
+  } else {
+    toggleAsignarHabNumero(this.value);
+  }
+});
+
+
+
+document.getElementById('tvImagenTrasera').addEventListener('change', function() {
+  readImage(this, 'previewTrasera', res => currentImgTrasera = res);
+});
+
+function cancelarFormTV() {
+  resetFormTV();
+  showPage('inventario');
+}
+
+function editarTV(id) {
+  const tv = loadTVs().find(t => String(t.id) === String(id));
+  if (!tv) return;
+  resetFormTV();
+  document.getElementById('tvId').value          = tv.id;
+  document.getElementById('tvCodigo').value       = tv.codigo;
+  
+  renderMarcas();
+  document.getElementById('tvMarca').value        = tv.marca || '';
+  if (document.getElementById('tvMarca').selectedIndex === -1 && tv.marca) {
+    const custom = loadMarcas();
+    if (!custom.includes(tv.marca)) {
+      custom.push(tv.marca);
+      saveMarcas(custom);
+    }
+    renderMarcas();
+    document.getElementById('tvMarca').value = tv.marca;
+  }
+  document.getElementById('tvModelo').value       = tv.modelo;
+  document.getElementById('tvSerial').value       = tv.serial;
+  document.getElementById('tvSerial').disabled    = true;
+  document.getElementById('tvTamano').value       = tv.tamano || '42 pulgadas';
+  document.getElementById('tvTipo').value         = tv.tipo || '';
+  document.getElementById('tvResolucion').value   = tv.resolucion || '';
+  document.getElementById('tvSmartTV').value      = tv.smarttv || 'si';
+  // Format date for display (dd/mm/yyyy) using fmtDateOnly
+  document.getElementById('tvFechaIngreso').value = fmtDateOnly(tv.fechaIngreso) || '';
+  
+  renderUbicaciones();
+  document.getElementById('tvUbicacion').value = tv.ubicacion || '';
+  if (document.getElementById('tvUbicacion').selectedIndex === -1) {
+    document.getElementById('tvUbicacion').value = 'otro';
+    document.getElementById('grpUbicacionOtro').style.display = '';
+    document.getElementById('tvUbicacionOtro').value = tv.ubicacion;
+  } else {
+    document.getElementById('grpUbicacionOtro').style.display = 'none';
+  }
+  const esHabitacion = tv.ubicacion === 'Habitacion' || tv.ubicacion === 'Habitación';
+  document.getElementById('grpTvHabitacion').style.display = esHabitacion ? '' : 'none';
+  document.getElementById('tvHabitacion').value = tv.habitacion || '';
+  
+  currentImgTrasera = tv.imgTrasera || '';
+  currentImgFile = null;
+  const label = document.getElementById('labelTrasera');
+  if (currentImgTrasera) {
+    document.getElementById('previewTrasera').innerHTML = `<img src="${currentImgTrasera}" style="max-width:100%;max-height:250px;border-radius:4px;" />`;
+    if (label) label.classList.add('has-image');
+  } else {
+    document.getElementById('previewTrasera').innerHTML = '';
+    if (label) label.classList.remove('has-image');
+  }
+  
+  document.getElementById('tvEstado').value       = tv.estado || 'operativo';
+  document.getElementById('tvObservaciones').value= tv.observaciones || '';
+  document.getElementById('formTVTitle').textContent   = '✏️ Editar TV';
+  document.getElementById('btnGuardarTV').textContent  = '💾 Actualizar TV';
+  showPage('nuevo-tv');
+}
+
+document.getElementById('formTV').addEventListener('submit', e => {
+  e.preventDefault();
+  const get = id => document.getElementById(id).value.trim();
+  
+  if (!get('tvId') && get('tvSerial')) {
+    const msgEl = document.getElementById('modalConfirmSerialMsg');
+    msgEl.innerHTML = `¿Estás seguro de que el serial <strong>'${get('tvSerial')}'</strong> es correcto?<br>Una vez guardado no podrás modificarlo.`;
+    
+    const btnAceptar = document.getElementById('btnConfirmSerialAceptar');
+    const newBtnAceptar = btnAceptar.cloneNode(true);
+    btnAceptar.parentNode.replaceChild(newBtnAceptar, btnAceptar);
+    
+    newBtnAceptar.addEventListener('click', () => {
+      closeModal('modalConfirmSerial');
+      procesarGuardadoTV();
+    });
+    
+    openModal('modalConfirmSerial');
+    return;
+  }
+
+  procesarGuardadoTV();
+
+  async function procesarGuardadoTV() {
+    function highlightField(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.style.borderColor = '#ff4d6d';
+        el.style.boxShadow = '0 0 0 2px rgba(255,77,109,0.35)';
+        el.style.transition = 'border-color 0.3s, box-shadow 0.3s';
+      }
+      return el;
+    }
+    function clearHighlights() {
+      document.querySelectorAll('#formTV input, #formTV select').forEach(el => {
+        el.style.borderColor = '';
+        el.style.boxShadow = '';
+      });
+    }
+    clearHighlights();
+
+    const requiredFields = [
+      { id: 'tvCodigo', msg: 'El código es obligatorio.' },
+      { id: 'tvMarca', msg: 'Seleccione la marca.' },
+      { id: 'tvModelo', msg: 'El modelo es obligatorio.' },
+      { id: 'tvSerial', msg: 'El serial es obligatorio.' },
+      { id: 'tvUbicacion', msg: 'Seleccione la ubicación.' }
+    ];
+    for (const f of requiredFields) {
+      const val = document.getElementById(f.id).value.trim();
+      if (!val || val === 'otro') {
+        highlightField(f.id);
+        document.getElementById(f.id).focus();
+        showToast(f.msg, 'error');
+        return;
+      }
+    }
+
+    let marcaVal = get('tvMarca');
+    let ubicacionVal = get('tvUbicacion');
+    if (ubicacionVal === 'otro') {
+      const newUbi = get('tvUbicacionOtro');
+      if (!newUbi) {
+        highlightField('tvUbicacionOtro');
+        document.getElementById('tvUbicacionOtro').focus();
+        showToast('Especifique la nueva ubicación.', 'error');
+        return;
+      }
+      ubicacionVal = newUbi;
+      const custom = loadUbicaciones();
+      if (!custom.includes(newUbi)) {
+        custom.push(newUbi);
+        await saveUbicaciones(custom);
+      }
+    }
+
+    if (ubicacionVal === 'Habitacion' || ubicacionVal === 'Habitación') {
+      const habVal = get('tvHabitacion');
+      if (!habVal) {
+        highlightField('tvHabitacion');
+        document.getElementById('tvHabitacion').focus();
+        showToast('Ingrese el número de habitación.', 'error');
+        return;
+      }
+      const existId = get('tvId');
+      const tvsCheck = loadTVs();
+      const tvEnHab = tvsCheck.find(t => t.habitacion === habVal && (t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') && String(t.id) !== String(existId));
+      if (tvEnHab) {
+        highlightField('tvHabitacion');
+        document.getElementById('tvHabitacion').focus();
+        showToast(`La habitación ${habVal} ya tiene el TV [${tvEnHab.codigo}].`, 'error');
+        return;
+      }
+    }
+
+  const tvs = loadTVs();
+  const existId = get('tvId');
+  const currentTv = existId ? tvs.find(t => String(t.id) === String(existId)) : null;
+  
+  const serialVal = get('tvSerial');
+  if ((!currentTv || currentTv.serial !== serialVal) && tvs.some(t => t.serial.toLowerCase() === serialVal.toLowerCase() && String(t.id) !== String(existId))) {
+    showToast('Ya existe un TV con este número de serie.', 'error');
+    return;
+  }
+  
+  const codigoVal = get('tvCodigo');
+  if ((!currentTv || currentTv.codigo !== codigoVal) && tvs.some(t => t.codigo.toLowerCase() === codigoVal.toLowerCase() && String(t.id) !== String(existId))) {
+    showToast('Ya existe un TV con este código.', 'error');
+    return;
+  }
+  
+  if ((!currentTv || currentTv.imgTrasera !== currentImgTrasera) && currentImgTrasera && tvs.some(t => t.imgTrasera === currentImgTrasera && String(t.id) !== String(existId))) {
+    showToast('Esta imagen trasera ya está asignada a otro TV.', 'error');
+    return;
+  }
+
+  const tv = {
+    id:           existId || uid(),
+    codigo:       get('tvCodigo'),
+    marca:        marcaVal,
+    modelo:       get('tvModelo'),
+    serial:       get('tvSerial'),
+    tamano:       get('tvTamano'),
+    tipo:         get('tvTipo'),
+    resolucion:   get('tvResolucion'),
+    smarttv:      get('tvSmartTV'),
+    fechaIngreso: get('tvFechaIngreso'),
+    ubicacion:    ubicacionVal,
+    habitacion:   (ubicacionVal === 'Habitacion' || ubicacionVal === 'Habitación') ? get('tvHabitacion') : '',
+    imgTrasera:   currentImgTrasera,
+    estado:       get('tvEstado'),
+    observaciones:get('tvObservaciones'),
+    updatedAt:    new Date().toISOString()
+  };
+
+  const btnSubmit = document.getElementById('btnGuardarTV');
+  const prevText = btnSubmit.textContent;
+  btnSubmit.textContent = 'Guardando...';
+  btnSubmit.disabled = true;
+
+  try {
+    // La imagen ya está comprimida en currentImgTrasera como base64
+    await db.collection('tvs').doc(tv.id).set(tv);
+
+    if (existId) {
+      showToast('TV actualizado correctamente.', 'success');
+      resetFormTV();
+      showPage('inventario');
+    } else {
+      showToast('Registro guardado exitosamente.', 'success');
+      resetFormTV();
+      // Regresar el puntero a la opción marca
+      setTimeout(() => {
+        document.getElementById('tvMarca').focus();
+      }, 50);
+    }
+  } catch(e) {
+    console.error(e);
+    showToast('Error al guardar: ' + e.message, 'error');
+  } finally {
+    btnSubmit.textContent = prevText;
+    btnSubmit.disabled = false;
+  }
+  }
+});
+
+// ─── FORMULARIO MOVIMIENTO ───────────────────────────────────
+function populateMovTV() {
+  const tvs = loadTVs();
+  const sel = document.getElementById('movTV');
+  if (sel) {
+    if (window.movTVTomSelect) {
+      window.movTVTomSelect.destroy();
+    }
+    sel.innerHTML = '<option value="">-- Seleccionar TV --</option>' +
+      tvs.filter(t => t.estado !== 'baja' && t.ubicacion !== 'Almacen').map(t =>
+        `<option value="${t.id}" data-codigo="${t.codigo}" data-marca="${t.marca}" data-modelo="${t.modelo || ''}" data-serial="${t.serial}" data-ubi="${t.ubicacion === 'Habitacion' ? ('Hab. ' + (t.habitacion || '?')) : (t.ubicacion || '—')}">[${t.codigo}] ${t.marca} ${t.modelo || ''} · S/N: ${t.serial}</option>`
+      ).join('');
+      
+    window.movTVTomSelect = new TomSelect("#movTV", {
+      create: false,
+      sortField: { field: "text", direction: "asc" },
+      placeholder: "🔍 Buscar por código, marca o serial…",
+      render: {
+        option: function(data, escape) {
+          const opt = sel.querySelector(`option[value="${data.value}"]`);
+          const codigo  = opt ? opt.dataset.codigo  : '';
+          const marca   = opt ? opt.dataset.marca   : '';
+          const modelo  = opt ? opt.dataset.modelo  : '';
+          const serial  = opt ? opt.dataset.serial  : '';
+          const ubi     = opt ? opt.dataset.ubi     : '';
+          if (!codigo) return `<div class="ts-tv-option ts-tv-placeholder">${escape(data.text)}</div>`;
+          return `<div class="ts-tv-option" style="flex-direction: row; align-items: center; gap: 0.75rem;">
+            <span class="ts-tv-code">${escape(codigo)}</span>
+            <span class="ts-tv-brand">${escape(marca)}</span>
+            <span class="ts-tv-serial" style="margin-left: 1rem; padding-left: 0; color: var(--text-muted); font-family: monospace; font-size: 0.85rem;">${escape(serial)}</span>
+          </div>`;
+        },
+        item: function(data, escape) {
+          const opt = sel.querySelector(`option[value="${data.value}"]`);
+          const codigo = opt ? opt.dataset.codigo : '';
+          const serial = opt ? opt.dataset.serial : '';
+          const marca  = opt ? opt.dataset.marca  : '';
+          if (!codigo) return `<div>${escape(data.text)}</div>`;
+          return `<div class="ts-tv-item"><strong>${escape(codigo)}</strong><span class="ts-tv-divider"></span><span>${escape(marca)}</span><span class="ts-tv-divider"></span><span class="ts-tv-item-serial">${escape(serial)}</span></div>`;
+        }
+      }
+    });
+  }
+
+  // Poblar select oculto de tipo con opciones
+  const selTipo = document.getElementById('movTipo');
+  if (selTipo && !selTipo.options.length) {
+    selTipo.innerHTML = `
+      <option value="">-- Seleccionar --</option>
+      <option value="traslado_hab">Traslado a otra habitación</option>
+      <option value="entrada_taller">Envío a taller</option>
+      <option value="retorno_taller">Retorno de taller</option>
+      <option value="baja">Dar de baja</option>
+      <option value="reingreso">Reingreso al servicio</option>
+      <option value="otro">Otro</option>
+    `;
+  }
+  
+  // Limpiar info card del TV
+  _movUpdateTVCard(null);
+  
+  const custom = loadUbicaciones();
+  const origenInput = document.getElementById('movOrigen');
+  if (origenInput) {
+    origenInput.value = 'Sin TV seleccionado';
+  }
+  const destInput = document.getElementById('movDestino');
+  if (destInput) {
+    destInput.value = '';
+  }
+
+  // Datetime local = ahora
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  document.getElementById('movFecha').value = now.toISOString().slice(0,16);
+
+  // Limpiar selección de tipo visual
+  document.querySelectorAll('.mov-tipo-btn').forEach(b => b.classList.remove('selected'));
+  
+  adjustMovDestinoHabWidth();
+}
+
+/** Actualiza la tarjeta de info del TV en el panel izquierdo y activa/desactiva el overlay */
+function _movUpdateTVCard(tv) {
+  const card        = document.getElementById('movTVCard');
+  const placeholder = document.getElementById('movTVPlaceholder');
+  const imgWrap     = document.getElementById('movTVImgContainer');
+  const imgEl       = document.getElementById('movTVImg');
+  const overlay     = document.getElementById('movPanelOverlay');
+
+  if (!tv) {
+    if (card)        card.style.display = 'none';
+    if (placeholder) placeholder.style.display = '';
+    if (imgEl)       imgEl.src = '';
+    // Mostrar overlay (bloquear panel derecho)
+    if (overlay)     overlay.classList.remove('hidden');
+    return;
+  }
+
+  // Datos
+  const ubicLabel = (tv.ubicacion === 'Habitacion' && tv.habitacion)
+    ? `Hab. ${tv.habitacion}`
+    : (tv.ubicacion || '—');
+
+  const setVal = (id, txt) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = txt || '—';
+  };
+  setVal('movTVInfoCodigo',   tv.codigo);
+  setVal('movTVInfoMarca',    `${tv.marca} ${tv.modelo || ''}`.trim());
+  setVal('movTVInfoSerial',   tv.serial);
+  setVal('movTVInfoUbicacion', ubicLabel);
+
+  // Imagen
+  if (tv.imgTrasera) {
+    imgEl.src = tv.imgTrasera;
+    if (imgWrap) imgWrap.style.display = '';
+  } else {
+    imgEl.src = '';
+    if (imgWrap) imgWrap.style.display = 'none';
+  }
+
+  if (placeholder) placeholder.style.display = 'none';
+  if (card)        card.style.display = '';
+  // Ocultar overlay (habilitar panel derecho)
+  if (overlay)     overlay.classList.add('hidden');
+}
+
+
+
+if (document.getElementById('movTV')) {
+  document.getElementById('movTV').addEventListener('change', function() {
+    const val = this.value;
+    const tvs = loadTVs();
+    const tv = tvs.find(t => String(t.id) === String(val));
+    
+    const origenSelect = document.getElementById('movOrigen');
+    
+    if (tv) {
+      // Actualizar campo origen
+      if (origenSelect) {
+        let valToSet = (tv.ubicacion === 'Habitacion' && tv.habitacion) ? tv.habitacion : tv.ubicacion;
+        origenSelect.value = valToSet || '';
+      }
+      // Actualizar tarjeta de info del TV
+      _movUpdateTVCard(tv);
+    } else {
+      if (origenSelect) origenSelect.value = 'Sin TV seleccionado';
+      _movUpdateTVCard(null);
+    }
+  });
+}
+
+// ── Tarjetas visuales de Tipo de Movimiento ──
+document.querySelectorAll('.mov-tipo-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (btn.classList.contains('mov-tv-saliente-btn')) return;
+    document.querySelectorAll('.mov-tipo-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    const sel = document.getElementById('movTipo');
+    if (sel) sel.value = btn.dataset.val;
+
+    const destInput = document.getElementById('movDestino');
+    const destSelect = document.getElementById('movDestinoSelect');
+
+    if (btn.dataset.val === 'otro') {
+      if (destInput) destInput.style.display = 'none';
+      if (destSelect) {
+        destSelect.style.display = '';
+        renderMovDestinoSelect();
+        const nuevaArea = prompt('Ingrese el nombre de la nueva Área/Destino:');
+        if (nuevaArea && nuevaArea.trim()) {
+            const areaTrimmed = nuevaArea.trim();
+            const custom = loadAreas();
+            if (!custom.includes(areaTrimmed)) {
+                custom.push(areaTrimmed);
+                saveAreas(custom);
+                renderMovDestinoSelect();
+            }
+            destSelect.value = areaTrimmed;
+        } else {
+            destSelect.value = '';
+        }
+      }
+    } else {
+      if (destSelect) destSelect.style.display = 'none';
+      if (destInput) {
+        destInput.style.display = '';
+        destInput.value = btn.querySelector('.mov-tipo-txt').textContent;
+        destInput.dispatchEvent(new Event('change'));
+      }
+    }
+
+    setTimeout(() => {
+      if (btn.dataset.val === 'traslado_hab') {
+        const grp = document.getElementById('grpMovDestinoHab');
+        if (grp) grp.style.display = '';
+        document.getElementById('movTvSaliente').value = '';
+        document.getElementById('movTvSalienteOtro').style.display = 'none';
+        document.querySelectorAll('.mov-tv-saliente-btn').forEach(b => b.classList.remove('selected'));
+        const habInput = document.getElementById('movDestinoHab');
+        if (habInput) habInput.focus();
+      } else {
+        const grp = document.getElementById('grpMovDestinoHab');
+        if (grp) grp.style.display = 'none';
+        const fechaInput = document.getElementById('movFecha');
+        if (fechaInput) fechaInput.focus();
+      }
+    }, 100);
+  });
+});
+
+function selectTvSaliente(val) {
+  document.querySelectorAll('.mov-tv-saliente-btn').forEach(b => b.classList.remove('selected'));
+  const btn = document.querySelector(`.mov-tv-saliente-btn[data-val="${val}"]`);
+  if (btn) btn.classList.add('selected');
+  document.getElementById('movTvSaliente').value = val;
+  const otroInput = document.getElementById('movTvSalienteOtro');
+  if (val === 'otro') {
+    otroInput.style.display = '';
+    otroInput.focus();
+  } else {
+    otroInput.style.display = 'none';
+    otroInput.value = '';
+  }
+}
+
+// Navegación con flechas en tarjetas de tipo de movimiento
+document.querySelectorAll('.mov-tipo-btn').forEach((btn, idx, btns) => {
+  btn.setAttribute('tabindex', '0');
+  btn.addEventListener('keydown', e => {
+    const cols = window.innerWidth <= 500 ? 2 : 3;
+    let target = null;
+    if (e.key === 'ArrowRight') { e.preventDefault(); target = btns[idx + 1] || btns[0]; }
+    else if (e.key === 'ArrowLeft')  { e.preventDefault(); target = btns[idx - 1] || btns[btns.length - 1]; }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); target = btns[idx + cols] || btns[btns.length - 1]; }
+    else if (e.key === 'ArrowUp')   { e.preventDefault(); target = btns[idx - cols] || btns[0]; }
+    else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); btn.click(); }
+    if (target) target.focus();
+  });
+});
+
+function renderMovDestinoSelect() {
+  const sel = document.getElementById('movDestinoSelect');
+  if (!sel) return;
+  const custom = loadAreas();
+  sel.innerHTML = `
+    <option value="">-- Seleccionar Área --</option>
+    <option value="Premium 68">Premium 68</option>
+    <option value="Premium 69">Premium 69</option>
+    <option value="Anillo 1">Anillo 1</option>
+    <option value="Anillo 2">Anillo 2</option>
+    <option value="Anillo 3">Anillo 3</option>
+    ${custom.map(a => `<option value="${a}">${a}</option>`).join('')}
+    <option value="nueva">➕ Agregar nueva área...</option>
+  `;
+}
+
+if (document.getElementById('movDestinoSelect')) {
+  document.getElementById('movDestinoSelect').addEventListener('change', function() {
+    if (this.value === 'nueva') {
+      const nuevaArea = prompt('Ingrese el nombre de la nueva Área/Destino:');
+      if (nuevaArea && nuevaArea.trim()) {
+        const areaTrimmed = nuevaArea.trim();
+        const custom = loadAreas();
+        if (!custom.includes(areaTrimmed)) {
+          custom.push(areaTrimmed);
+          saveAreas(custom);
+          renderMovDestinoSelect();
+        }
+        this.value = areaTrimmed;
+      } else {
+        this.value = '';
+      }
+    }
+  });
+}
+
+
+const elMovDestino = document.getElementById('movDestino');
+if (elMovDestino) {
+  elMovDestino.addEventListener('change', function() {
+    const selTipo = document.getElementById('movTipo');
+    const grp = document.getElementById('grpMovDestinoHab');
+    if (selTipo && selTipo.value === 'traslado_hab') {
+      grp.style.display = '';
+      document.getElementById('movDestinoHab').required = true;
+    } else {
+      grp.style.display = 'none';
+      document.getElementById('movDestinoHab').required = false;
+      document.getElementById('movDestinoHab').value = '';
+      document.getElementById('movDestinoHabAviso').style.display = 'none';
+    }
+  });
+}
+
+const elMovDestinoHab = document.getElementById('movDestinoHab');
+if (elMovDestinoHab) {
+  elMovDestinoHab.addEventListener('input', function() {
+    adjustMovDestinoHabWidth();
+    const habVal = this.value.trim();
+    const aviso = document.getElementById('movDestinoHabAviso');
+    if (!habVal) {
+      aviso.style.display = 'none';
+      return;
+    }
+    if (!isValidRoom(habVal)) {
+      aviso.textContent = `La habitación ${habVal} no es válida.`;
+      aviso.style.display = 'block';
+      return;
+    }
+    const tvs = loadTVs();
+    const exist = tvs.find(t => t.estado === 'activo' && t.ubicacion === 'Habitacion' && t.habitacion === habVal);
+    
+    const currentTvId = document.getElementById('movTV') ? document.getElementById('movTV').value : '';
+    if (exist && exist.id !== currentTvId) {
+      aviso.textContent = `¡Atención! La habitación ${habVal} ya posee el TV: [${exist.codigo}] ${exist.marca}.`;
+      aviso.style.display = 'block';
+    } else {
+      aviso.style.display = 'none';
+    }
+  });
+
+  elMovDestinoHab.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const habVal = this.value.trim();
+      if (!habVal || !isValidRoom(habVal)) return;
+      const tvs = loadTVs();
+      const currentTvId = document.getElementById('movTV') ? document.getElementById('movTV').value : '';
+      const exist = tvs.find(t => t.estado === 'activo' && t.ubicacion === 'Habitacion' && t.habitacion === habVal);
+      if (exist && exist.id !== currentTvId) {
+        document.getElementById('reemplazoInfo').textContent = `La habitación ${habVal} ya tiene el TV [${exist.codigo}] ${exist.marca} ${exist.modelo || ''}.`;
+        document.getElementById('reemplazoOtroGroup').style.display = 'none';
+        document.getElementById('reemplazoOtroInput').value = '';
+        document.querySelectorAll('#modalReemplazo .btn').forEach(b => b.style.borderColor = '');
+        window._tvReemplazoData = { id: exist.id, codigo: exist.codigo, marca: exist.marca, modelo: exist.modelo || '', tamano: exist.tamano || '', serial: exist.serial, ubicacion: exist.ubicacion, habitacion: exist.habitacion || '' };
+        window._resolveReemplazo = null;
+        openModal('modalReemplazo');
+      }
+    }
+  });
+}
+const elMovMotivo = document.getElementById('movMotivo');
+if (elMovMotivo) {
+  elMovMotivo.addEventListener('input', function() {
+    const btnContainer = document.getElementById('movActaContainer');
+    const tvId = document.getElementById('movTV') ? document.getElementById('movTV').value : '';
+    if (this.value.trim().length > 0 && tvId) {
+      if (btnContainer) btnContainer.style.display = 'block';
+    } else {
+      if (btnContainer) btnContainer.style.display = 'none';
+    }
+  });
+}
+
+
+function imprimirActaActual() {
+  const get = id => (document.getElementById(id) ? document.getElementById(id).value.trim() : '');
+  const tvId = get('movTV');
+  if (!tvId) {
+    showToast('Selecciona un TV primero.', 'error');
+    return;
+  }
+  const tvs = loadTVs();
+  const tv = tvs.find(t => String(t.id) === String(tvId));
+  if (!tv) return;
+
+  const fechaVal = get('movFecha');
+  const d = fechaVal ? new Date(fechaVal) : new Date();
+  const fechaFmt = `Playa El Agua, ${d.toLocaleDateString('es-VE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }).replace(/de (\d{4})/, 'del $1')}.-`;
+  const horaFmt = d.toLocaleTimeString('es-VE', { hour:'2-digit', minute:'2-digit' });
+
+  const respInputs = document.querySelectorAll('.mov-resp-input');
+  const respList = Array.from(respInputs).map(i => i.value.trim()).filter(Boolean);
+  const resp1 = respList[0] || '______________________';
+  const resp2 = respList[1] || '______________________';
+  const resp3 = respList[2] || '______________________';
+  let origen = get('movOrigen') || '______________';
+  let destino = get('movDestino') || '______________';
+  const selTipo = get('movTipo');
+  if (selTipo === 'traslado_hab') {
+    const hab = get('movDestinoHab');
+    destino = hab ? `Hab. ${hab}` : destino;
+  }
+
+  const motivo = get('movMotivo') || 'Sin descripción';
+
+  const confirmar = confirm('¿Desea imprimir el acta de movimiento?');
+  if (!confirmar) return;
+
+  const w = window.open('', '_blank');
+  if (!w) {
+    showToast('El navegador bloqueó la ventana emergente. Permite ventanas emergentes para imprimir.', 'error');
+    return;
+  }
+  w.document.write(`
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Acta de Movimiento - ${tv.codigo}</title>
+  <style>
+    @page { margin: 20mm; }
+    body { font-family: 'Arial', sans-serif; color: #000; font-size: 14px; line-height: 1.6; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .header-logo-h { font-size: 32px; font-weight: normal; line-height: 1; display: flex; flex-direction: column; align-items: center; font-family: 'Times New Roman', serif; }
+    .header-logo-h span { font-size: 10px; font-weight: normal; letter-spacing: 2px; font-family: 'Arial', sans-serif; margin-top: 4px; }
+    .header-logo-pcp { font-size: 40px; font-weight: bold; display: flex; align-items: center; gap: 8px; color: #444; }
+    .title { text-align: center; text-decoration: underline; font-weight: bold; margin: 30px 0; font-size: 16px; }
+    .date-row { text-align: right; margin-bottom: 30px; }
+    .content { text-align: justify; margin-bottom: 20px; }
+    .lines-container { margin-top: 10px; margin-bottom: 60px; }
+    .line-row { border-bottom: 1px solid #000; height: 28px; width: 100%; }
+    .signatures { display: flex; flex-direction: column; gap: 50px; margin-top: 40px; }
+    .sig-main { display: flex; justify-content: space-between; }
+    .sig-colabs { display: flex; justify-content: space-between; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-logo-h">
+      |--|
+      <span>HESPERIA</span>
+      <span style="font-size:8px; letter-spacing: 1px; margin-top: 2px;">PLAYA EL AGUA</span>
+    </div>
+    <div class="header-logo-pcp">
+      <span style="font-size: 32px;">🛡️</span>PCP
+    </div>
+  </div>
+
+  <div class="title">CONSTANCIA DE CAMBIO DE ACTIVOS</div>
+
+  <div class="date-row">${fechaFmt}</div>
+
+  <div class="content">
+    En esta misma fecha, siendo las <u>&nbsp;${horaFmt}&nbsp;</u>, por instrucciones de la Gerencia General, se procede a realizar el siguiente movimiento de activo en el HPA.
+    <br><br>
+    <strong>Descripción del procedimiento:</strong><br>
+      Se procede a registrar el movimiento del TV código interno <strong>${tv.codigo}</strong>, marca <strong>${tv.marca}</strong>, modelo <strong>${tv.modelo || '___'}</strong>, de <strong>${tv.tamano || '___'}</strong>, y serial <strong>${tv.serial}</strong>.<br>
+    <strong>Ubicación de Origen:</strong> ${origen} &rarr; <strong>Ubicación de Destino:</strong> ${destino}.<br>
+    ${mov.tipo === 'traslado_hab' && mov.tvSaliente ? `<strong>Destino del TV saliente:</strong> ${mov.tvSaliente}.<br>` : ''}
+    <strong>Motivo del movimiento:</strong> ${motivo}<br>
+    <strong>Responsable de la ejecución:</strong> ${respList.length ? respList.join(', ') : '______________________'}
+  </div>
+
+  <div class="lines-container">
+    <div class="line-row"></div>
+    <div class="line-row"></div>
+    <div class="line-row"></div>
+    <div class="line-row"></div>
+    <div class="line-row"></div>
+    <div class="line-row"></div>
+  </div>
+
+  <div class="signatures">
+    <div class="sig-main">
+      <div>Gerencia General __________________________________</div>
+      <div>Firma _______________________________________</div>
+    </div>
+    <div>
+      <div>Firma de los colaboradores actuantes.</div>
+      <div class="sig-colabs">
+        <span>1. ${resp1} ______________</span>
+        <span>2. ${resp2} ______________</span>
+        <span>3. ${resp3} ______________</span>
+      </div>
+    </div>
+  </div>
+  <script>
+    window.onload = () => { window.print(); };
+    window.onafterprint = () => { window.close(); };
+  </script>
+</body>
+</html>
+  `);
+  w.document.close();
+}
+
+function imprimirActaFromData(mov, tv) {
+  if (!tv) return;
+
+  const d = mov.fecha && !mov.fecha.includes('desconocida') ? new Date(mov.fecha) : new Date();
+  const fechaFmt = `Playa El Agua, ${d.toLocaleDateString('es-VE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }).replace(/de (\d{4})/, 'del $1')}.-`;
+  const horaFmt = d.toLocaleTimeString('es-VE', { hour:'2-digit', minute:'2-digit' });
+
+  const respRaw = mov.responsable || '';
+  const respList = respRaw.split(',').map(r => r.trim()).filter(Boolean);
+  const resp1 = respList[0] || '______________________';
+  const resp2 = respList[1] || '______________________';
+  const resp3 = respList[2] || '______________________';
+
+  let origen = mov.origen;
+  if (!origen || origen === '______________') {
+    if (tv.ubicacion === 'Habitacion') {
+      origen = `Hab. ${tv.habitacion || '?'}`;
+    } else {
+      origen = tv.ubicacion || 'Almacén';
+    }
+  }
+  let destino = mov.destino || '______________';
+  if (mov.habDestino) destino = `Hab. ${mov.habDestino}`;
+  const motivo = mov.motivo || 'Sin descripción';
+
+  const actaHTML = `
+    <div class="acta-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+      <div style="font-size:32px; line-height:1; display:flex; flex-direction:column; align-items:center; font-family:'Times New Roman', serif;">
+        |--|
+        <span style="font-size:10px; font-weight:normal; letter-spacing:2px; font-family:Arial, sans-serif; margin-top:4px;">HESPERIA</span>
+        <span style="font-size:8px; letter-spacing:1px; font-family:Arial, sans-serif;">PLAYA EL AGUA</span>
+      </div>
+      <div style="font-size:40px; font-weight:bold; display:flex; align-items:center; gap:8px; color:#444;">
+        <span style="font-size:32px;">🛡️</span>PCP
+      </div>
+    </div>
+    <div style="text-align:center; text-decoration:underline; font-weight:bold; margin:30px 0; font-size:16px; color:#1a202c;">CONSTANCIA DE CAMBIO DE ACTIVOS</div>
+    <div style="text-align:right; margin-bottom:30px;">${fechaFmt}</div>
+    <div style="text-align:justify; margin-bottom:20px; color:#2d3748; line-height:1.8;">
+      En esta misma fecha, siendo las <u>&nbsp;${horaFmt}&nbsp;</u>, por instrucciones de la Gerencia General, se procede a realizar el siguiente movimiento de activo en el HPA.
+      <br><br>
+      <strong>Descripción del procedimiento:</strong><br>
+    Se procede a registrar el movimiento del TV código interno <strong>${tv.codigo}</strong>, marca <strong>${tv.marca}</strong>, modelo <strong>${tv.modelo || '___'}</strong>, de <strong>${tv.tamano || '___'}</strong>, y serial <strong>${tv.serial}</strong>.<br>
+      <strong>Ubicación de Origen:</strong> ${origen} &rarr; <strong>Ubicación de Destino:</strong> ${destino}.<br>
+      ${mov.tvReemplazo ? `<strong>TV Reemplazado:</strong><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;Código: <strong>${mov.tvReemplazo.codigo}</strong><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;Marca: <strong>${mov.tvReemplazo.marca}</strong>, Modelo: <strong>${mov.tvReemplazo.modelo}</strong><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;Tamaño: <strong>${mov.tvReemplazo.tamano}</strong>, Serial: <strong>${mov.tvReemplazo.serial}</strong><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;Reubicado a: <strong>${mov.tvReemplazo.destino}</strong>.<br>` : ''}
+      ${mov.tvSaliente ? `<strong>Destino del TV Saliente:</strong> <strong>${mov.tvSaliente}</strong>.<br>` : ''}
+      <strong>Motivo del movimiento:</strong> ${motivo}<br>
+      <strong>Responsable de la ejecución:</strong> ${respList.length ? respRaw : '______________________'}
+    </div>
+    <div style="margin-top:10px; margin-bottom:60px;">
+      <div style="border-bottom:1px solid #000; height:28px;"></div>
+      <div style="border-bottom:1px solid #000; height:28px;"></div>
+      <div style="border-bottom:1px solid #000; height:28px;"></div>
+      <div style="border-bottom:1px solid #000; height:28px;"></div>
+      <div style="border-bottom:1px solid #000; height:28px;"></div>
+      <div style="border-bottom:1px solid #000; height:28px;"></div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:50px; margin-top:40px;">
+      <div style="display:flex; justify-content:space-between;">
+        <div>Gerencia General __________________________________</div>
+        <div>Firma _______________________________________</div>
+      </div>
+      <div>
+        <div>Firma de los colaboradores actuantes.</div>
+        <div style="display:flex; justify-content:space-between; margin-top:20px;">
+          <span>1. ${resp1} ______________</span>
+          <span>2. ${resp2} ______________</span>
+          <span>3. ${resp3} ______________</span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  let overlay = document.getElementById('actaOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'actaOverlay';
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal" style="max-width:800px; max-height:95vh; background:#fff; color:#000;">
+        <div class="modal-header">
+          <h3 style="color:#1a202c; text-shadow:none;">📄 Acta de Movimiento</h3>
+          <button class="modal-close" onclick="closeActaOverlay()" title="Cerrar">✕</button>
+        </div>
+        <div class="modal-body" id="actaBody" style="padding:2rem; max-height:70vh; overflow-y:auto; background:#fff;"></div>
+        <div style="padding:0.75rem 1.5rem; display:flex; gap:1rem; justify-content:space-between; align-items:center; background:#f8fafc; border-top:2px solid #e2e8f0;">
+          <button onclick="closeActaOverlay()" style="background:#4f46e5; color:#fff; border:none; padding:0.8rem 1.8rem; border-radius:10px; font-size:1rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:0.6rem; box-shadow:0 4px 14px rgba(79,70,229,0.4); transition:all 0.2s;">
+            ← Volver al Menú
+          </button>
+          <div style="display:flex; gap:0.75rem;">
+            <button class="btn btn-primary" onclick="printActaOverlay()" style="display:flex; align-items:center; gap:0.5rem;">
+              🖨️ Imprimir
+            </button>
+            <button onclick="closeActaOverlay()" style="background:#ef4444; color:#fff; border:none; padding:0.7rem 1.2rem; border-radius:8px; font-size:0.9rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:0.5rem;">
+              Cerrar
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  }
+
+  document.getElementById('actaBody').innerHTML = actaHTML;
+  overlay.classList.add('open');
+
+  _lastFocusedElement = document.activeElement;
+
+  saveActaImage(mov, tv);
+}
+
+async function saveActaImage(mov, tv) {
+  try {
+    const actaBody = document.getElementById('actaBody');
+    if (!actaBody || typeof html2canvas === 'undefined') return;
+
+    const canvas = await html2canvas(actaBody, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    if (!blob) return;
+
+    const d = new Date();
+    const fecha = d.toISOString().slice(0, 10);
+    const hora = d.toTimeString().slice(0, 5).replace(':', '');
+    const codigo = tv.codigo || 'TV';
+    const tipo = mov.tipo || 'mov';
+    const filePath = `actas/${codigo}_${tipo}_${fecha}_${hora}.png`;
+    const ref = storage.ref(filePath);
+    await ref.put(blob);
+    const url = await ref.getDownloadURL();
+
+    await db.collection('movimientos').doc(mov.id).update({ actaUrl: url, actaPath: filePath });
+  } catch (err) {
+    console.error('Error guardando acta:', err);
+  }
+}
+
+function printActaOverlay() {
+  const body = document.getElementById('actaBody');
+  if (!body) return;
+  const w = window.open('', '_blank');
+  if (!w) {
+    showToast('El navegador bloqueó la ventana emergente. Permite ventanas emergentes para imprimir.', 'error');
+    return;
+  }
+  w.document.write(`
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Acta de Movimiento</title>
+  <style>
+    @page { margin: 20mm; }
+    body { font-family: 'Arial', sans-serif; color: #000; font-size: 14px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  ${body.innerHTML}
+  <script>
+    window.onload = () => { window.print(); };
+    window.onafterprint = () => { window.close(); };
+  </script>
+</body>
+</html>
+  `);
+  w.document.close();
+  closeActaOverlay();
+}
+
+function closeActaOverlay() {
+  const overlay = document.getElementById('actaOverlay');
+  if (overlay) overlay.classList.remove('open');
+  if (_lastFocusedElement) { _lastFocusedElement.focus(); _lastFocusedElement = null; }
+  showPage('inventario');
+}
+
+function openActaFromMov(e, movId) {
+  e.preventDefault();
+  e.stopPropagation();
+  const movs = loadMovs();
+  const tvs = loadTVs();
+  const mov = movs.find(m => String(m.id) === String(movId));
+  if (!mov) return;
+  const tv = tvs.find(t => String(t.id) === String(mov.tvId));
+  if (!tv) return;
+
+  const d = mov.fecha && !mov.fecha.includes('desconocida') ? new Date(mov.fecha) : new Date();
+  const fechaFmt = `Playa El Agua, ${d.toLocaleDateString('es-VE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }).replace(/de (\d{4})/, 'del $1')}.-`;
+  const horaFmt = d.toLocaleTimeString('es-VE', { hour:'2-digit', minute:'2-digit' });
+
+  const respRaw = mov.responsable || '';
+  const respList = respRaw.split(',').map(r => r.trim()).filter(Boolean);
+  const resp1 = respList[0] || '______________________';
+  const resp2 = respList[1] || '______________________';
+  const resp3 = respList[2] || '______________________';
+
+  let origen = mov.origen;
+  if (!origen || origen === '______________') {
+    if (tv.ubicacion === 'Habitacion') {
+      origen = `Hab. ${tv.habitacion || '?'}`;
+    } else {
+      origen = tv.ubicacion || 'Almacén';
+    }
+  }
+  let destino = mov.destino || '______________';
+  if (mov.habDestino) destino = `Hab. ${mov.habDestino}`;
+  const motivo = mov.motivo || 'Sin descripción';
+
+  const w = window.open('', '_blank');
+  if (!w) {
+    showToast('El navegador bloqueó la ventana emergente.', 'error');
+    return;
+  }
+  w.document.write(`
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Acta de Movimiento - ${tv.codigo}</title>
+  <style>
+    @page { margin: 20mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Arial', sans-serif; color: #000; font-size: 14px; line-height: 1.6; background: #f0f0f0; padding: 20px; }
+    .acta-container { max-width: 800px; margin: 0 auto; background: #fff; padding: 40px; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+    .toolbar { max-width: 800px; margin: 0 auto 15px; display: flex; justify-content: flex-end; gap: 10px; }
+    .toolbar button { padding: 10px 20px; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .btn-print { background: #4f46e5; color: #fff; }
+    .btn-print:hover { background: #4338ca; }
+    .btn-close { background: #e2e8f0; color: #333; }
+    .btn-close:hover { background: #cbd5e1; }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <button class="btn-print" onclick="window.print();">🖨️ Imprimir</button>
+    <button class="btn-close" onclick="window.close();">Cerrar</button>
+  </div>
+  <div class="acta-container">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+      <div style="font-size:32px; line-height:1; display:flex; flex-direction:column; align-items:center; font-family:'Times New Roman', serif;">
+        |--|
+        <span style="font-size:10px; font-weight:normal; letter-spacing:2px; font-family:Arial, sans-serif; margin-top:4px;">HESPERIA</span>
+        <span style="font-size:8px; letter-spacing:1px; font-family:Arial, sans-serif;">PLAYA EL AGUA</span>
+      </div>
+      <div style="font-size:40px; font-weight:bold; display:flex; align-items:center; gap:8px; color:#444;">
+        <span style="font-size:32px;">🛡️</span>PCP
+      </div>
+    </div>
+    <div style="text-align:center; text-decoration:underline; font-weight:bold; margin:30px 0; font-size:16px;">CONSTANCIA DE CAMBIO DE ACTIVOS</div>
+    <div style="text-align:right; margin-bottom:30px;">${fechaFmt}</div>
+    <div style="text-align:justify; margin-bottom:20px; line-height:1.8;">
+      En esta misma fecha, siendo las <u>&nbsp;${horaFmt}&nbsp;</u>, por instrucciones de la Gerencia General, se procede a realizar el siguiente movimiento de activo en el HPA.
+      <br><br>
+      <strong>Descripción del procedimiento:</strong><br>
+    Se procede a registrar el movimiento del TV código interno <strong>${tv.codigo}</strong>, marca <strong>${tv.marca}</strong>, modelo <strong>${tv.modelo || '___'}</strong>, de <strong>${tv.tamano || '___'}</strong>, y serial <strong>${tv.serial}</strong>.<br>
+      <strong>Ubicación de Origen:</strong> ${origen} &rarr; <strong>Ubicación de Destino:</strong> ${destino}.<br>
+      ${mov.tvReemplazo ? `<strong>TV Reemplazado:</strong><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;Código: <strong>${mov.tvReemplazo.codigo}</strong><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;Marca: <strong>${mov.tvReemplazo.marca}</strong>, Modelo: <strong>${mov.tvReemplazo.modelo}</strong><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;Tamaño: <strong>${mov.tvReemplazo.tamano}</strong>, Serial: <strong>${mov.tvReemplazo.serial}</strong><br>
+      &nbsp;&nbsp;&nbsp;&nbsp;Reubicado a: <strong>${mov.tvReemplazo.destino}</strong>.<br>` : ''}
+      ${mov.tvSaliente ? `<strong>Destino del TV Saliente:</strong> <strong>${mov.tvSaliente}</strong>.<br>` : ''}
+      <strong>Motivo del movimiento:</strong> ${motivo}<br>
+      <strong>Responsable de la ejecución:</strong> ${respList.length ? respRaw : '______________________'}
+    </div>
+    <div style="margin-top:10px; margin-bottom:60px;">
+      <div style="border-bottom:1px solid #000; height:28px;"></div>
+      <div style="border-bottom:1px solid #000; height:28px;"></div>
+      <div style="border-bottom:1px solid #000; height:28px;"></div>
+      <div style="border-bottom:1px solid #000; height:28px;"></div>
+      <div style="border-bottom:1px solid #000; height:28px;"></div>
+      <div style="border-bottom:1px solid #000; height:28px;"></div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:50px; margin-top:40px;">
+      <div style="display:flex; justify-content:space-between;">
+        <div>Gerencia General __________________________________</div>
+        <div>Firma _______________________________________</div>
+      </div>
+      <div>
+        <div>Firma de los colaboradores actuantes.</div>
+        <div style="display:flex; justify-content:space-between; margin-top:20px;">
+          <span>1. ${resp1} ______________</span>
+          <span>2. ${resp2} ______________</span>
+          <span>3. ${resp3} ______________</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+  `);
+  w.document.close();
+}
+
+function resetFormMovimiento() {
+  document.getElementById('formMovimiento').reset();
+  populateMovTV();
+  const grp = document.getElementById('grpMovDestinoHab');
+  if (grp) grp.style.display = 'none';
+  const aviso = document.getElementById('movDestinoHabAviso');
+  if (aviso) aviso.style.display = 'none';
+  document.getElementById('movTvSaliente').value = '';
+  document.getElementById('movTvSalienteOtro').style.display = 'none';
+  document.querySelectorAll('.mov-tv-saliente-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelectorAll('.mov-tipo-btn').forEach(b => b.classList.remove('selected'));
+  _movUpdateTVCard(null);
+
+  const btnContainer = document.getElementById('movActaContainer');
+  if (btnContainer) btnContainer.style.display = 'none';
+
+  const destInput = document.getElementById('movDestino');
+  const destSelect = document.getElementById('movDestinoSelect');
+  if (destSelect) destSelect.style.display = 'none';
+  if (destInput) destInput.style.display = '';
+
+  document.querySelectorAll('.mov-resp-input').forEach(i => i.value = '');
+
+  adjustMovDestinoHabWidth();
+}
+
+
+document.getElementById('formMovimiento').addEventListener('submit', async e => {
+  e.preventDefault();
+  const get = id => document.getElementById(id).value.trim();
+  
+  const tvId = get('movTV');
+  
+  const tipo = get('movTipo'),
+        rawFecha = get('movFecha'), motivo = get('movMotivo');
+  const origen = get('movOrigen');
+
+  const fecha = (!rawFecha || rawFecha.includes('0001') || rawFecha.includes('0000')) ? 'desconocida' : rawFecha;
+
+  const respInputs = document.querySelectorAll('.mov-resp-input');
+  const respList = Array.from(respInputs).map(i => i.value.trim()).filter(Boolean);
+  const responsable = respList.join(', ');
+  let destino = get('movDestino');
+  if (tipo === 'otro') {
+    destino = get('movDestinoSelect');
+    if (!destino) {
+      showToast('Selecciona el área de destino.', 'error'); return;
+    }
+  }
+  let habDestino = '';
+
+  const tvs = loadTVs();
+
+  if (tipo === 'traslado_hab') {
+    habDestino = get('movDestinoHab');
+    if (!habDestino) {
+      showToast('Ingresa el número de habitación destino.', 'error'); return;
+    }
+    const tvSaliente = get('movTvSaliente');
+    if (!tvSaliente) {
+      showToast('Selecciona el destino del TV saliente.', 'error'); return;
+    }
+    if (tvSaliente === 'otro') {
+      const tvSalienteOtro = get('movTvSalienteOtro');
+      if (!tvSalienteOtro) {
+        showToast('Especifica el destino del TV saliente.', 'error'); return;
+      }
+    }
+    if (!isValidRoom(habDestino)) {
+      showToast(`La habitación ${habDestino} no es válida.`, 'error'); return;
+    }
+    const exist = tvs.find(t => t.estado === 'activo' && t.ubicacion === 'Habitacion' && t.habitacion === habDestino);
+    if (exist && exist.id !== tvId) {
+      if (!window._tvReemplazo || window._tvReemplazo.id !== exist.id) {
+        showToast('Presiona Enter en el campo de habitación para indicar el destino del TV existente.', 'error'); return;
+      }
+    } else {
+      window._tvReemplazo = null;
+    }
+  }
+
+  if (tipo === 'retorno_taller') {
+      // For retorno_taller, we also ask for destination but it's just 'Destino' or 'Habitación' if applicable.
+      // Wait, in retorno_taller, movDestino is "Retorno de Taller", it doesn't show hab input by default in UI.
+      // So no need to check habDestino for retorno_taller if it's not provided.
+  }
+
+  if (!tvId) {
+    showToast('Seleccione un TV válido de la lista.', 'error'); return;
+  }
+  if (tipo === 'traslado_hab') {
+    destino = `Hab. ${habDestino}`;
+  }
+  if (!tipo || !responsable || !motivo || !origen) {
+    showToast('Completa todos los campos obligatorios.', 'error'); return;
+  }
+
+  const btnSubmit = e.target.querySelector('button[type="submit"]');
+  const prevText = btnSubmit.textContent;
+  btnSubmit.textContent = 'Registrando...';
+  btnSubmit.disabled = true;
+
+  try {
+    const tvSalienteVal = get('movTvSaliente');
+    const tvSalienteOtroVal = get('movTvSalienteOtro');
+    const destinoTvSaliente = tvSalienteVal === 'otro' ? tvSalienteOtroVal : tvSalienteVal;
+    const mov = {
+      id: uid(), tvId, tipo, fecha, responsable, motivo, origen, destino, habDestino,
+      tvReemplazo: window._tvReemplazo || null,
+      tvSaliente: destinoTvSaliente || '',
+      creadoEn: new Date().toISOString()
+    };
+    await db.collection('movimientos').doc(mov.id).set(mov);
+
+    // Reubicar TV existente si hubo reemplazo
+    if (window._tvReemplazo) {
+      const reemp = window._tvReemplazo;
+      const reempUpdates = { ubicacion: 'Habitacion' };
+      if (/^\d+$/.test(reemp.destino)) {
+        reempUpdates.habitacion = reemp.destino;
+      } else {
+        reempUpdates.habitacion = '';
+        reempUpdates.ubicacion = reemp.destino;
+        if (reemp.destino.toLowerCase().includes('taller')) reempUpdates.estado = 'taller';
+      }
+      await db.collection('tvs').doc(reemp.id).update(reempUpdates);
+      window._tvReemplazo = null;
+    }
+
+    // Actualizar estado del TV
+    const tv = tvs.find(t => String(t.id) === String(tvId));
+    if (tv) {
+      const updates = {};
+      if (tipo === 'entrada_taller')  updates.estado = 'taller';
+      if (tipo === 'retorno_taller')  { updates.estado = 'activo'; if (mov.habDestino) { updates.habitacion = mov.habDestino; updates.piso = mov.pisoDestino || tv.piso; } }
+      if (tipo === 'baja')            updates.estado = 'baja';
+      if (tipo === 'reingreso')       updates.estado = 'activo';
+      if (tipo === 'traslado_hab')    {
+        updates.estado = 'activo';
+        if (mov.habDestino) { updates.habitacion = mov.habDestino; updates.piso = mov.pisoDestino || tv.piso; }
+      }
+      if (Object.keys(updates).length > 0) {
+        await db.collection('tvs').doc(tvId).update(updates);
+      }
+    }
+
+    showToast('El movimiento de TV fue guardado con éxito.', 'success', 4000);
+    setTimeout(() => imprimirActaFromData(mov, tv), 4000);
+    resetFormMovimiento();
+  } catch(err) {
+    console.error(err);
+    showToast('Error al registrar movimiento: ' + err.message, 'error');
+  } finally {
+    btnSubmit.textContent = prevText;
+    btnSubmit.disabled = false;
+  }
+});
+
+// ─── HISTORIAL GLOBAL ─────────────────────────────────────────
+function renderHistorial(filtroTipo = '', busqueda = '') {
+  const tvs  = loadTVs();
+  let movs = loadMovs().sort((a, b) => {
+    const fa = a.fecha || '';
+    const fb = b.fecha || '';
+    const aDesconocida = fa.includes('desconocida') || !fa;
+    const bDesconocida = fb.includes('desconocida') || !fb;
+    if (aDesconocida && bDesconocida) return 0;
+    if (aDesconocida) return 1;
+    if (bDesconocida) return -1;
+    return fb.localeCompare(fa);
+  });
+  if (filtroTipo) movs = movs.filter(m => m.tipo === filtroTipo);
+  if (busqueda) {
+    const q = busqueda.toLowerCase();
+    movs = movs.filter(m => {
+      const tv = tvs.find(t => String(t.id) === String(m.tvId));
+      return [m.motivo, m.responsable, m.habDestino, tv?.codigo, tv?.habitacion]
+        .some(v => v && v.toLowerCase().includes(q));
+    });
+  }
+  const tbody = document.getElementById('historialBody');
+  if (!movs.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Sin resultados.</td></tr>'; return;
+  }
+  tbody.innerHTML = movs.map(m => {
+    const tv = tvs.find(t => String(t.id) === String(m.tvId));
+    const hasActa = tv && (m.actaUrl || m.tipo);
+    const actaBtn = hasActa ? `<span class="ml-acta-icon" title="Ver acta" style="cursor:pointer; font-size:0.85rem; opacity:0.7; margin-left:4px;" onclick="event.stopPropagation(); openActaFromMov(event, '${m.id}')">📄</span>` : '';
+    const logDelBtn = hasPermission('eliminar_movimiento') && !m.deleted ? `<button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); confirmarEliminarMovimiento('${m.id}')" title="Ocultar registro" style="font-size:0.7rem; padding:2px 6px;">🗑️</button>` : '';
+    const physDelBtn = hasPermission('eliminar_fisico_movimiento') && m.deleted ? `<button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); confirmarEliminacionFisicaMovimiento('${m.id}')" title="Eliminar permanentemente" style="font-size:0.7rem; padding:2px 6px; background:rgba(255,77,109,0.2); border-color:rgba(255,77,109,0.5);">💀</button>` : '';
+    const actaDelBtn = hasPermission('eliminar_fisico_acta') && m.actaUrl ? `<button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); confirmarEliminarActaMovimiento('${m.id}')" title="Eliminar acta" style="font-size:0.7rem; padding:2px 6px; background:rgba(255,165,0,0.15); border-color:rgba(255,165,0,0.4); color:#ff9500;">📄✕</button>` : '';
+    const actionsHtml = logDelBtn || physDelBtn || actaDelBtn ? `<div class="actions-cell" style="gap:4px;">${logDelBtn}${physDelBtn}${actaDelBtn}</div>` : '—';
+    return `<tr tabindex="0" data-tvid="${m.tvId || ''}" data-movid="${m.id || ''}">
+      <td style="font-size:0.78rem;white-space:nowrap">${fmtDate(m.fecha)}</td>
+      <td><strong style="color:var(--accent)">${tv?.codigo || '—'}</strong>${actaBtn}</td>
+      <td>${tv?.habitacion || '—'}</td>
+      <td>${tipoLabel[m.tipo] || m.tipo}</td>
+      <td>${m.habDestino ? 'Hab. ' + m.habDestino : '—'}</td>
+      <td>${m.responsable}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${m.motivo}">${m.motivo}</td>
+      <td style="white-space:nowrap">${actionsHtml}</td>
+    </tr>`;
+  }).join('');
+
+  const hRows = document.querySelectorAll('#historialBody tr');
+  hRows.forEach((row, idx) => {
+    row.addEventListener('click', () => {
+      hRows.forEach(r => r.classList.remove('tr-selected'));
+      row.classList.add('tr-selected');
+      row.focus();
+    });
+    row.addEventListener('keydown', e => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const next = hRows[idx + 1] || hRows[0];
+        hRows.forEach(r => r.classList.remove('tr-selected'));
+        next.classList.add('tr-selected');
+        next.focus();
+        next.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prev = hRows[idx - 1] || hRows[hRows.length - 1];
+        hRows.forEach(r => r.classList.remove('tr-selected'));
+        prev.classList.add('tr-selected');
+        prev.focus();
+        prev.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        const tvId = row.dataset.tvid;
+        if (tvId) verDetalle(tvId);
+      } else if (e.key === 'Escape') {
+        hRows.forEach(r => r.classList.remove('tr-selected'));
+        row.blur();
+      }
+    });
+  });
+  if (hRows.length) {
+    hRows[0].classList.add('tr-selected');
+    hRows[0].focus();
+  }
+}
+
+document.getElementById('searchHistorial').addEventListener('input', applyHistorialFilters);
+document.getElementById('filterTipoMov').addEventListener('change', applyHistorialFilters);
+
+function applyHistorialFilters() {
+  renderHistorial(
+    document.getElementById('filterTipoMov').value,
+    document.getElementById('searchHistorial').value
+  );
+}
+
+// ─── ASIGNAR TV A HABITACIÓN ──────────────────────────────────
+let _asignarTvId = null;
+
+const DB_AREAS = 'hpa_areas';
+function loadAreas() { return window.appData?.metadata?.areas || []; }
+async function saveAreas(d) { await db.collection('config').doc('metadata').update({ areas: d }); }
+
+function renderAsignarAreas() {
+  const sel = document.getElementById('asignarArea');
+  if (!sel) return;
+  const custom = loadAreas();
+  sel.innerHTML = `
+    <option value="">-- Seleccionar Área --</option>
+    <option value="Premium 68">Premium 68</option>
+    <option value="Premium 69">Premium 69</option>
+    <option value="Anillo 1">Anillo 1</option>
+    <option value="Anillo 2">Anillo 2</option>
+    <option value="Anillo 3">Anillo 3</option>
+    ${custom.map(a => `<option value="${a}">${a}</option>`).join('')}
+    <option value="otro">otros</option>
+  `;
+}
+
+function abrirAsignarHabitacion(tvId) {
+  const tv = loadTVs().find(t => String(t.id) === String(tvId));
+  if (!tv) return;
+
+  if (tv.ubicacion && tv.ubicacion !== 'Almacen' && tv.ubicacion !== 'Almacén') {
+    showToast(`El TV [${tv.codigo}] se encuentra en "${tv.ubicacion}". Solo se pueden asignar TVs desde Almacén.`, 'error');
+    return;
+  }
+
+  _asignarTvId = tvId;
+
+  // Cuadro de texto televisor a asignar debe aparecer: codigo, marca, tamano y serial
+  document.getElementById('asignarTvInfo').innerHTML =
+    `<div class="asignar-tv-info-card">
+       <div class="atv-header">
+         <span class="atv-badge">${tv.codigo}</span>
+         <span class="atv-brand">${tv.marca} ${tv.modelo || ''}</span>
+       </div>
+       <div class="atv-details">
+         <div class="atv-row"><span class="atv-lbl">📐 Tamaño</span><span class="atv-val">${tv.tamano || '—'}</span></div>
+         <div class="atv-row atv-serial-row"><span class="atv-lbl">🔑 Serial</span><code class="atv-serial">${tv.serial}</code></div>
+       </div>
+     </div>`;
+     
+  const imgCont = document.getElementById('asignarTvImgContainer');
+  const imgEl = document.getElementById('asignarTvImg');
+  if (tv.imgTrasera) {
+    imgEl.src = tv.imgTrasera;
+    if (imgCont) imgCont.style.display = 'block';
+    imgEl.onclick = null;
+    imgEl.ondblclick = () => zoomImagen(tv.imgTrasera, 'Foto de Etiqueta (Trasera) - ' + tv.codigo);
+  } else {
+    if (imgCont) imgCont.style.display = 'none';
+    imgEl.onclick = null;
+    imgEl.ondblclick = null;
+  }
+  document.getElementById('asignarHabNumero').value  = tv.habitacion || '';
+  
+  renderAsignarAreas();
+  const selArea = document.getElementById('asignarArea');
+  
+  // Si la TV tiene un piso/área existente y no es uno de los por defecto, asegurar que esté en custom
+  if (tv.piso && tv.piso !== 'Premium 68' && tv.piso !== 'Premium 69' && tv.piso !== 'Anillo 1' && tv.piso !== 'Anillo 2' && tv.piso !== 'Anillo 3') {
+    const custom = loadAreas();
+    if (!custom.includes(tv.piso)) {
+      custom.push(tv.piso);
+      saveAreas(custom);
+      renderAsignarAreas();
+    }
+  }
+  
+  selArea.value = tv.piso || '';
+  toggleAsignarHabNumero(tv.piso || '');
+  
+  document.getElementById('asignarResponsable').value = '';
+  document.getElementById('asignarNota').value        = '';
+  document.querySelectorAll('.asignar-resp-input').forEach((inp, i) => { if (i > 0) inp.value = ''; });
+
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  document.getElementById('asignarFechaIngreso').value = `${y}-${m}-${d}T${hh}:${mm}`;
+
+  openModal('modalAsignar');
+}
+
+document.getElementById('btnClearAsignarFecha').addEventListener('click', function() {
+  document.getElementById('asignarFechaIngreso').value = '';
+  document.getElementById('asignarArea').focus();
+});
+
+document.getElementById('btnConfirmAsignar').addEventListener('click', async () => {
+  if (!_asignarTvId) return;
+
+  const tvsCheck = loadTVs();
+  const tvCheck = tvsCheck.find(t => String(t.id) === String(_asignarTvId));
+  if (tvCheck && tvCheck.ubicacion && tvCheck.ubicacion !== 'Almacen' && tvCheck.ubicacion !== 'Almacén') {
+    showToast(`El TV [${tvCheck.codigo}] ya no está en Almacén. Ubicación actual: ${tvCheck.ubicacion}.`, 'error');
+    closeModal('modalAsignar');
+    return;
+  }
+
+  const hab  = document.getElementById('asignarHabNumero').value.trim();
+  let area   = document.getElementById('asignarArea').value;
+  const respInputs = document.querySelectorAll('.asignar-resp-input');
+  const respList = Array.from(respInputs).map(i => i.value.trim()).filter(Boolean);
+  const resp = respList.join(', ');
+  const nota = document.getElementById('asignarNota').value.trim();
+
+  if (!hab) { showToast('Ingresa el número de habitación.', 'error'); return; }
+
+  const tvsExistCheck = loadTVs();
+  const tvEnHabitacion = tvsExistCheck.find(t => t.habitacion === hab && t.ubicacion === 'Habitacion' && String(t.id) !== String(_asignarTvId));
+  if (tvEnHabitacion) {
+    showToast(`La habitación ${hab} ya tiene el TV [${tvEnHabitacion.codigo}] ${tvEnHabitacion.marca} ${tvEnHabitacion.modelo}.`, 'error');
+    return;
+  }
+  
+  if (area === 'otro') {
+    showToast('Por favor seleccione o ingrese una nueva área.', 'error');
+    return;
+  }
+
+  if (!resp) { showToast('Ingresa el nombre del responsable.', 'error'); return; }
+
+  const btnSubmit = document.getElementById('btnConfirmAsignar');
+  const prevText = btnSubmit.textContent;
+  btnSubmit.textContent = 'Asignando...';
+  btnSubmit.disabled = true;
+
+  try {
+    const fechaVal = document.getElementById('asignarFechaIngreso').value;
+    let fechaMov;
+    if (fechaVal) {
+      fechaMov = fechaVal;
+    } else {
+      fechaMov = 'desconocida';
+    }
+    const tvsList = loadTVs();
+    const tvActual = tvsList.find(t => String(t.id) === String(_asignarTvId));
+    const origenUbic = tvActual ? (tvActual.ubicacion === 'Habitacion' ? `Hab. ${tvActual.habitacion || '?'}` : tvActual.ubicacion || 'Almacén') : 'Almacén';
+    const mov = {
+      id: uid(),
+      tvId: _asignarTvId,
+      tipo: 'traslado_hab',
+      fecha: fechaMov,
+      responsable: resp,
+      motivo: nota || `Asignación a habitación ${hab}`,
+      origen: origenUbic,
+      destino: `Hab. ${hab}`,
+      habDestino: hab,
+      pisoDestino: area,
+      observaciones: '',
+      creadoEn: new Date().toISOString()
+    };
+    
+    await db.collection('movimientos').doc(mov.id).set(mov);
+
+    // Actualizar TV
+    const updates = {
+      habitacion: hab,
+      piso: area || '',
+      ubicacion: 'Habitacion',
+      estado: 'activo'
+    };
+    await db.collection('tvs').doc(_asignarTvId).update(updates);
+
+    _asignarTvId = null;
+    closeModal('modalAsignar');
+    renderAsignarTVPage();
+    showToast(`TV asignado a habitación ${hab} correctamente. ✅`, 'success');
+    const tvsAsig = loadTVs();
+    const tvAsig = tvsAsig.find(t => String(t.id) === String(mov.tvId));
+    setTimeout(() => imprimirActaFromData(mov, tvAsig), 1000);
+  } catch(err) {
+    console.error(err);
+    showToast('Error al asignar TV: ' + err.message, 'error');
+  } finally {
+    btnSubmit.textContent = prevText;
+    btnSubmit.disabled = false;
+  }
+});
+
+function renderAsignarTVPage() {
+  const tvs = loadTVs().filter(t => t.estado !== 'baja' && t.ubicacion !== 'Habitacion');
+  const container = document.getElementById('page-asignar-tv');
+  if (!container) return;
+
+  if (!tvs.length) {
+    container.innerHTML = `
+      <div class="form-container">
+        <div class="card">
+          <div class="card-header">
+            <h2>📌 Asignación de TV</h2>
+          </div>
+          <div class="card-body">
+            <p class="empty-state">No hay televisores en Almacén o Taller disponibles para asignar.</p>
+          </div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="form-container" style="max-width: 100%;">
+      <div class="card">
+        <div class="card-header">
+          <h2>📌 Asignación de TV</h2>
+        </div>
+        <div class="card-body">
+          <p style="color: var(--text-secondary); margin-bottom: 1.25rem; font-size: 0.9rem;">
+            Listado de televisores actualmente en stock (Almacén / Taller) listos para ser asignados a una habitación.
+          </p>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Ubicación Actual</th>
+                  <th>Marca</th>
+                  <th>Modelo</th>
+                  <th>Estado</th>
+                  <th>Acción</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${tvs.map(t => `
+                  <tr tabindex="0" data-tvid="${t.id}">
+                    <td><strong style="color:var(--accent)">${t.codigo}</strong></td>
+                    <td>${t.ubicacion || '—'}</td>
+                    <td>${t.marca}</td>
+                    <td>${t.modelo}</td>
+                    <td>${estadoBadge[t.estado] || t.estado}</td>
+                    <td>
+                      <button class="btn btn-assign btn-sm" onclick="abrirAsignarHabitacion('${t.id}')">
+                        🏨 Asignar a Habitación
+                      </button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const aRows = container.querySelectorAll('#page-asignar-tv tbody tr');
+  aRows.forEach((row, idx) => {
+    row.addEventListener('click', () => {
+      aRows.forEach(r => r.classList.remove('tr-selected'));
+      row.classList.add('tr-selected');
+      row.focus();
+    });
+    row.addEventListener('keydown', e => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const next = aRows[idx + 1] || aRows[0];
+        aRows.forEach(r => r.classList.remove('tr-selected'));
+        next.classList.add('tr-selected');
+        next.focus();
+        next.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prev = aRows[idx - 1] || aRows[aRows.length - 1];
+        aRows.forEach(r => r.classList.remove('tr-selected'));
+        prev.classList.add('tr-selected');
+        prev.focus();
+        prev.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        const btn = row.querySelector('.btn-assign');
+        if (btn) btn.click();
+      } else if (e.key === 'Escape') {
+        aRows.forEach(r => r.classList.remove('tr-selected'));
+        row.blur();
+      }
+    });
+  });
+  if (aRows.length) {
+    aRows[0].classList.add('tr-selected');
+    aRows[0].focus();
+  }
+}
+
+// Drag and Drop support for image upload
+const dropZone = document.getElementById('labelTrasera');
+if (dropZone) {
+  ['dragenter', 'dragover'].forEach(eventName => {
+    dropZone.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    }, false);
+  });
+
+  ['dragleave', 'drop'].forEach(eventName => {
+    dropZone.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+    }, false);
+  });
+
+  dropZone.addEventListener('drop', (e) => {
+    const dt = e.dataTransfer;
+    const files = dt.files;
+    const input = document.getElementById('tvImagenTrasera');
+    if (files.length && input) {
+      input.files = files;
+      input.dispatchEvent(new Event('change'));
+    }
+  });
+}
+
+// ─── IMPRIMIR INVENTARIO ─────────────────────────────────────
+let _printMenuOpen = false;
+
+function togglePrintMenu() {
+  _printMenuOpen = !_printMenuOpen;
+  const menu = document.getElementById('printFabMenu');
+  const btn  = document.getElementById('printFabBtn');
+  if (!menu || !btn) return;
+  menu.classList.toggle('open', _printMenuOpen);
+  btn.classList.toggle('active', _printMenuOpen);
+  if (_printMenuOpen) {
+    const options = menu.querySelectorAll('.print-fab-option');
+    if (options.length) {
+      options.forEach(o => o.setAttribute('tabindex', '0'));
+      options[0].focus();
+    }
+  }
+}
+
+function closePrintMenu() {
+  _printMenuOpen = false;
+  const menu = document.getElementById('printFabMenu');
+  const btn  = document.getElementById('printFabBtn');
+  if (menu) menu.classList.remove('open');
+  if (btn)  { btn.classList.remove('active'); btn.focus(); }
+}
+
+// Navegación con teclado en el menú FAB
+document.querySelectorAll('.print-fab-option').forEach((opt, idx, opts) => {
+  opt.setAttribute('tabindex', '0');
+  opt.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); (opts[idx + 1] || opts[0]).focus(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); (opts[idx - 1] || opts[opts.length - 1]).focus(); }
+    else if (e.key === 'Escape') { e.preventDefault(); closePrintMenu(); }
+    else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); opt.click(); }
+  });
+});
+
+// Tecla Escape global para cerrar menú FAB
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && _printMenuOpen) {
+    closePrintMenu();
+  }
+});
+
+// Cerrar menú al hacer clic fuera
+document.addEventListener('click', function(e) {
+  if (_printMenuOpen) {
+    const wrap = document.getElementById('printFabWrap');
+    if (wrap && !wrap.contains(e.target)) {
+      _printMenuOpen = false;
+      const menu = document.getElementById('printFabMenu');
+      const btn  = document.getElementById('printFabBtn');
+      if (menu) menu.classList.remove('open');
+      if (btn)  btn.classList.remove('active');
+    }
+  }
+});
+
+function imprimirReporte(tipo) {
+  // Cerrar el menú
+  _printMenuOpen = false;
+  const menu = document.getElementById('printFabMenu');
+  const btn  = document.getElementById('printFabBtn');
+  if (menu) menu.classList.remove('open');
+  if (btn)  btn.classList.remove('active');
+
+  const tvs  = loadTVs();
+  const movs = loadMovs();
+
+  // Filtrar según tipo
+  let lista = [];
+  let titulo = '';
+  let subtitulo = '';
+
+  const hoy = new Date().toLocaleDateString('es-VE', {
+    weekday: 'long', day: '2-digit', month: 'long', year: 'numeric'
+  });
+
+  if (tipo === 'general') {
+    lista = tvs;
+    titulo = 'Reporte General de Inventario';
+    subtitulo = `Total de televisores registrados: ${tvs.length}`;
+  } else if (tipo === 'almacen') {
+    lista = tvs.filter(t => t.ubicacion === 'Almacen' || t.estado === 'almacen');
+    titulo = 'TVs en Almacén';
+    subtitulo = `Total en almacén: ${lista.length}`;
+  } else if (tipo === 'habitacion') {
+    lista = tvs.filter(t => t.ubicacion === 'Habitacion' || t.estado === 'activo');
+    titulo = 'TVs en Habitación';
+    subtitulo = `Total en habitaciones: ${lista.length}`;
+  } else if (tipo === 'taller') {
+    lista = tvs.filter(t => t.estado === 'taller');
+    titulo = 'TVs en Taller';
+    subtitulo = `Total en taller: ${lista.length}`;
+  } else if (tipo === 'baja') {
+    lista = tvs.filter(t => t.estado === 'baja');
+    titulo = 'TVs Dados de Baja';
+    subtitulo = `Total dados de baja: ${lista.length}`;
+  }
+
+  // Construir tabla HTML
+  const filas = lista.map(t => {
+    const ubiMostrar = t.ubicacion === 'Habitacion'
+      ? `Hab. ${t.habitacion || '—'}` 
+      : (t.ubicacion || '—');
+    const estadoTexto = {
+      activo: 'En Habitación', taller: 'En Taller', baja: 'Dado de Baja',
+      almacen: 'Almacén', operativo: 'Operativo', inoperativo: 'Inoperativo'
+    }[t.estado] || t.estado || '—';
+    // Obtener último movimiento
+    const ultimoMov = movs
+      .filter(m => m.tvId === t.id)
+      .sort((a, b) => b.fecha.localeCompare(a.fecha))[0];
+    const ultimaFecha = ultimoMov ? fmtDate(ultimoMov.fecha) : '—';
+    return `
+      <tr>
+        <td>${t.codigo || '—'}</td>
+        <td>${ubiMostrar}</td>
+        <td>${t.marca || '—'}</td>
+        <td>${t.modelo || '—'}</td>
+        <td>${t.tamano || '—'}</td>
+        <td>${t.serial || '—'}</td>
+        <td>${estadoTexto}</td>
+        <td>${fmtDateOnly(t.fechaIngreso)}</td>
+        <td>${ultimaFecha}</td>
+      </tr>`;
+  }).join('');
+
+  const html = `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>${titulo} – Hesperia Playa El Agua</title>
+  <style>
+    @page { size: A4 landscape; margin: 18mm 15mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 11px;
+      color: #1a202c;
+      background: #fff;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 14px;
+      border-bottom: 3px solid #4f46e5;
+      margin-bottom: 16px;
+    }
+    .header-left h1 {
+      font-size: 18px;
+      font-weight: 800;
+      color: #4f46e5;
+      letter-spacing: -0.01em;
+    }
+    .header-left p {
+      font-size: 11px;
+      color: #718096;
+      margin-top: 3px;
+    }
+    .header-right {
+      text-align: right;
+      font-size: 10.5px;
+      color: #718096;
+      line-height: 1.6;
+    }
+    .header-right strong { color: #2d3748; }
+    .subtitle {
+      background: #f0f0ff;
+      border-left: 4px solid #4f46e5;
+      padding: 7px 12px;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #3730a3;
+      margin-bottom: 14px;
+      border-radius: 0 6px 6px 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10.5px;
+    }
+    thead tr {
+      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+      color: #fff;
+    }
+    thead th {
+      padding: 8px 10px;
+      font-weight: 700;
+      text-align: left;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-size: 9px;
+      white-space: nowrap;
+    }
+    tbody tr:nth-child(even) { background: #f8f7ff; }
+    tbody tr:hover { background: #eef2ff; }
+    tbody td {
+      padding: 7px 10px;
+      border-bottom: 1px solid #e2e8f0;
+      color: #2d3748;
+    }
+    tbody td:first-child {
+      font-weight: 700;
+      color: #4f46e5;
+    }
+    .empty { text-align: center; padding: 30px; color: #a0aec0; }
+    .footer {
+      margin-top: 18px;
+      text-align: center;
+      font-size: 9.5px;
+      color: #a0aec0;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <h1>📺 ${titulo}</h1>
+      <p>Hotel Hesperia Playa El Agua – Sistema de Control de TV</p>
+    </div>
+    <div class="header-right">
+      <strong>Fecha de emisión:</strong><br>${hoy}
+    </div>
+  </div>
+  <div class="subtitle">${subtitulo}</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Código</th>
+        <th>Ubicación</th>
+        <th>Marca</th>
+        <th>Modelo</th>
+        <th>Tamaño</th>
+        <th>Serial</th>
+        <th>Estado</th>
+        <th>F. Ingreso</th>
+        <th>Último Mov.</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${filas || '<tr><td colspan="9" class="empty">No hay registros para mostrar.</td></tr>'}
+    </tbody>
+  </table>
+  <div class="footer">
+    Control de TV – Hotel Hesperia Playa El Agua &nbsp;|&nbsp; Generado el ${hoy} &nbsp;|&nbsp; Total registros: ${lista.length}
+  </div>
+  <script>window.onload = function() { window.print(); }<\/script>
+</body>
+</html>`;
+
+  const win = window.open('', '_blank');
+  if (win) {
+    win.document.write(html);
+    win.document.close();
+  } else {
+    showToast('El navegador bloqueó la ventana emergente. Permite ventanas emergentes para imprimir.', 'error');
+  }
+}
+
+// Mostrar/ocultar FAB de imprimir según la página activa
+(function patchShowPageForPrint() {
+  const _origShowPage = showPage;
+  window.showPage = function(id) {
+    _origShowPage(id);
+    const fab = document.getElementById('printFabWrap');
+    if (fab) {
+      fab.style.display = (id === 'inventario') ? 'flex' : 'none';
+    }
+  };
+})();
+
+// ─── RESPONSABLES: navegación con Enter ────────────────────────
+document.querySelectorAll('.mov-resp-input').forEach((input, idx, inputs) => {
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (idx < inputs.length - 1) {
+        inputs[idx + 1].focus();
+      } else {
+        document.getElementById('movMotivo').focus();
+      }
+    }
+  });
+});
+
+// ─── INIT ─────────────────────────────────────────────────────
+
+// Ocultar FAB imprimir al inicio (se muestra solo en inventario)
+(function() {
+  const fab = document.getElementById('printFabWrap');
+  if (fab) fab.style.display = 'none';
+})();
+
+showPage('dashboard');

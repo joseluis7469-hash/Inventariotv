@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Borrar Todo Firebase</title>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+  <style>
+    body { font-family: Arial; background: #1a1a2e; color: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+    #box { background: #16213e; padding: 2rem; border-radius: 12px; border: 1px solid rgba(0,212,255,0.3); max-width: 500px; width: 100%; }
+    h2 { color: #ff4d6d; }
+    #log { background: #0f0f23; padding: 1rem; border-radius: 8px; margin-top: 1rem; max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.85rem; line-height: 1.6; }
+    .ok { color: #81c784; }
+    .err { color: #ff6b6b; }
+    .info { color: #64b5f6; }
+    button { margin-top: 1rem; padding: 0.8rem 2rem; background: #ff4d6d; color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; width: 100%; }
+    button:hover { background: #e63956; }
+  </style>
+</head>
+<body>
+  <div id="box">
+    <h2>🗑️ Borrar Todos los Datos</h2>
+    <p style="color:#aaa;">Presiona el botón para eliminar TVs, movimientos, config e imágenes de actas.</p>
+    <button onclick="borrarTodo()">BORRAR TODO</button>
+    <div id="log"></div>
+  </div>
+  <script>
+    firebase.initializeApp({
+      apiKey: "AIzaSyAwUErYNP2epUjvDFUIpa07qRggLjBhBMg",
+      authDomain: "tv-manager-z30y9.firebaseapp.com",
+      projectId: "tv-manager-z30y9",
+      storageBucket: "tv-manager-z30y9.firebasestorage.app",
+      messagingSenderId: "708018006363",
+      appId: "1:708018006363:web:c5c74539f1b24fef6fd27e"
+    });
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+    const logDiv = document.getElementById('log');
+    function log(msg, cls) {
+      logDiv.innerHTML += `<div class="${cls || 'info'}">${msg}</div>`;
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+    async function borrarTodo() {
+      if (!confirm('¿Eliminar TODOS los datos?')) return;
+      try {
+        log('Iniciando borrado...', 'info');
+
+        const tvsSnap = await db.collection('tvs').get();
+        log(`TVs encontrados: ${tvsSnap.size}`, 'info');
+        for (const doc of tvsSnap.docs) { await doc.ref.delete(); }
+        log('TVs borrados ✓', 'ok');
+
+        const movsSnap = await db.collection('movimientos').get();
+        log(`Movimientos encontrados: ${movsSnap.size}`, 'info');
+        for (const doc of movsSnap.docs) { await doc.ref.delete(); }
+        log('Movimientos borrados ✓', 'ok');
+
+        const cfgSnap = await db.collection('config').get();
+        for (const doc of cfgSnap.docs) { await doc.ref.delete(); }
+        log('Config borrada ✓', 'ok');
+
+        try {
+          const list = await storage.ref('actas').listAll();
+          log(`Imágenes encontradas: ${list.items.length}`, 'info');
+          for (const item of list.items) { await item.delete(); }
+          log('Imágenes borradas ✓', 'ok');
+        } catch(e) { log('Sin imágenes en Storage', 'info'); }
+
+        log('✅ BORRADO COMPLETO', 'ok');
+      } catch(err) {
+        log('❌ Error: ' + err.message, 'err');
+      }
+    }
+  </script>
+</body>
+</html>

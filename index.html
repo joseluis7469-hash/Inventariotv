@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Control de TV – Hotel Hesperia Playa El Agua</title>
+  <meta name="description" content="Sistema de inventario y control de movimientos de televisores del Hotel Hesperia Playa El Agua." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.default.css" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  
+  <!-- Firebase Compat Scripts -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="firebase-config.js"></script>
+</head>
+<body>
+
+  <!-- LOADING OVERLAY -->
+  <div id="app-loader" class="app-loader">
+    <div class="loader-spinner"></div>
+    <p>Conectando con la base de datos...</p>
+    <button class="btn btn-secondary btn-sm" style="margin-top: 1rem; font-size: 0.7rem;" onclick="migrateLocalStorageToFirebase()">Migrar datos locales (Opcional)</button>
+  </div>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <span class="logo-icon">📺</span>
+        <div class="logo-text">
+          <span class="logo-title">Control de TV</span>
+          <span class="logo-sub">Hesperia Playa El Agua</span>
+        </div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-page="dashboard" id="nav-dashboard">
+        <span class="nav-icon">🏠</span><span>Panel</span>
+      </a>
+      <a href="#" class="nav-item" data-page="inventario" id="nav-inventario">
+        <span class="nav-icon">📋</span><span>Inventario</span>
+      </a>
+      <a href="#" class="nav-item" data-page="movimientos" id="nav-movimientos">
+        <span class="nav-icon">🔄</span><span>Registrar Movimiento</span>
+      </a>
+      <a href="#" class="nav-item" data-page="historial" id="nav-historial">
+        <span class="nav-icon">📜</span><span>Historial Global</span>
+      </a>
+      <a href="#" class="nav-item" data-page="nuevo-tv" id="nav-nuevo-tv">
+        <span class="nav-icon">➕</span><span>Registrar TV</span>
+      </a>
+      <a href="users.html?panel=1" class="nav-item nav-usuarios disabled" id="nav-usuarios" style="pointer-events:none; opacity:0.4;">
+        <span class="nav-icon">👤</span><span>Gestión de Usuarios</span>
+      </a>
+
+    </nav>
+    <div class="sidebar-footer" id="sidebarFooter">
+      <div id="userInfoBar" style="display:none; width:100%; padding: 0.5rem 0;">
+        <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.4rem;">
+          <div id="userAvatar" style="width:28px; height:28px; border-radius:50%; background:linear-gradient(135deg,#00d4ff,#b36eff); color:#000; display:flex; align-items:center; justify-content:center; font-size:0.65rem; font-weight:700; flex-shrink:0;">?</div>
+          <div style="min-width:0;">
+            <div id="userDisplayName" style="font-size:0.72rem; font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div>
+            <div id="userDisplayRole" style="font-size:0.62rem; color:var(--accent);">—</div>
+          </div>
+        </div>
+        <button onclick="firebase.auth().signOut(); window.location.href='users.html';" style="width:100%; padding:6px; border:1px solid rgba(255,77,109,0.3); background:rgba(255,77,109,0.08); color:#ff4d6d; border-radius:6px; font-size:0.7rem; font-weight:600; cursor:pointer; font-family:inherit;">🚪 Cerrar Sesión</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <div class="main-wrapper">
+    <!-- TOP BAR -->
+    <header class="topbar">
+      <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">☰</button>
+      <h1 class="page-title" id="pageTitle">Dashboard</h1>
+      <div class="topbar-right">
+        <span class="date-badge" id="currentDate"></span>
+      </div>
+    </header>
+
+    <!-- PAGE: DASHBOARD -->
+    <section class="page active" id="page-dashboard">
+      <div class="stats-grid">
+        <div class="stat-card stat-total">
+          <div class="stat-icon">📺</div>
+          <div class="stat-info">
+            <span class="stat-num" id="stat-total">0</span>
+            <span class="stat-label">Total TVs</span>
+          </div>
+        </div>
+        <div class="stat-card stat-activo">
+          <div class="stat-icon">✅</div>
+          <div class="stat-info">
+            <span class="stat-num" id="stat-activos">0</span>
+            <span class="stat-label">En Habitación</span>
+          </div>
+        </div>
+        <div class="stat-card stat-taller">
+          <div class="stat-icon">🔧</div>
+          <div class="stat-info">
+            <span class="stat-num" id="stat-taller">0</span>
+            <span class="stat-label">En Taller</span>
+          </div>
+        </div>
+        <div class="stat-card stat-baja">
+          <div class="stat-icon">❌</div>
+          <div class="stat-info">
+            <span class="stat-num" id="stat-baja">0</span>
+            <span class="stat-label">Dados de Baja</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="dashboard-grid">
+        <div class="card">
+          <div class="card-header">
+            <h2>Últimos Movimientos</h2>
+          </div>
+          <div class="card-body" id="dash-movimientos">
+            <p class="empty-state">No hay movimientos registrados aún.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h2>TVs en Taller</h2>
+          </div>
+          <div class="card-body" id="dash-taller">
+            <p class="empty-state">Ningún TV en taller actualmente.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAGE: INVENTARIO -->
+    <section class="page" id="page-inventario" style="position: relative;">
+      <div class="page-toolbar">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="searchInventario" placeholder="Buscar por habitación, marca, modelo, serial…" />
+        </div>
+        <div class="filter-group">
+          <select id="filterEstado">
+            <option value="">Todos los estados</option>
+            <option value="almacen">Almacén</option>
+            <option value="operativo">Operativos</option>
+            <option value="activo">En Habitación</option>
+            <option value="taller">En Taller</option>
+            <option value="baja">Dados de Baja</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Botón Imprimir flotante (esquina inferior derecha) -->
+      <div class="print-fab-wrap" id="printFabWrap">
+        <div class="print-fab-menu" id="printFabMenu">
+          <button class="print-fab-option" onclick="imprimirReporte('general')">
+            <span>📋</span> General
+          </button>
+          <button class="print-fab-option" onclick="imprimirReporte('almacen')">
+            <span>📦</span> Almacén
+          </button>
+          <button class="print-fab-option" onclick="imprimirReporte('habitacion')">
+            <span>🛏️</span> Por Habitación
+          </button>
+          <button class="print-fab-option" onclick="imprimirReporte('taller')">
+            <span>🔧</span> En Taller
+          </button>
+          <button class="print-fab-option" onclick="imprimirReporte('baja')">
+            <span>❌</span> Dados de Baja
+          </button>
+        </div>
+        <button class="print-fab-btn" id="printFabBtn" onclick="togglePrintMenu()" title="Opciones de impresión">
+          <span class="print-fab-icon">🖨️</span>
+          <span class="print-fab-label">Imprimir</span>
+        </button>
+      </div>
+      <div class="table-wrapper">
+        <table class="data-table" id="inventarioTable">
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Ubicación</th>
+              <th>Marca</th>
+              <th>Modelo</th>
+              <th>Tamaño</th>
+              <th>Serial</th>
+              <th>Fecha Ingreso</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="inventarioBody">
+            <tr><td colspan="8" class="empty-state">No hay TVs registrados.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- PAGE: MOVIMIENTOS -->
+    <section class="page" id="page-movimientos">
+      <form id="formMovimiento" novalidate autocomplete="off" class="mov-layout">
+
+        <!-- ═══ PANEL IZQUIERDO: Selección de TV ═══ -->
+        <div class="mov-panel-left">
+
+          <!-- Encabezado del panel -->
+          <div class="mov-panel-header">
+            <span class="mov-panel-icon">📺</span>
+            <div>
+              <div class="mov-panel-title">Televisor</div>
+              <div class="mov-panel-sub">Selecciona el TV a mover</div>
+            </div>
+          </div>
+
+          <!-- Selector de TV -->
+          <div class="mov-field-block">
+            <label for="movTV" class="mov-field-label">Buscar TV <span class="required">*</span></label>
+            <select id="movTV" required></select>
+          </div>
+
+          <!-- Tarjeta de info del TV seleccionado -->
+          <div id="movTVCard" class="mov-tv-card" style="display:none;">
+            <!-- Imagen grande -->
+            <div id="movTVImgContainer" class="mov-tv-img-wrap" title="Doble clic o Enter para ampliar" tabindex="0" ondblclick="const img = document.getElementById('movTVImg'); if(img && img.src) zoomImagen(img.src,'Foto Etiqueta')" onkeydown="if(event.key==='Enter'){const img=document.getElementById('movTVImg');if(img&&img.src)zoomImagen(img.src,'Foto Etiqueta')}">
+              <img id="movTVImg" src="" alt="Etiqueta trasera" />
+              <div class="mov-tv-img-overlay" style="pointer-events: none;">🔍 Doble clic para ampliar</div>
+            </div>
+
+            <!-- Datos del TV -->
+            <div class="mov-tv-info">
+              <div class="mov-tv-info-row">
+                <span class="mov-tv-info-icon">🔢</span>
+                <div>
+                  <span class="mov-tv-info-label">Código</span>
+                  <span class="mov-tv-info-val" id="movTVInfoCodigo">—</span>
+                </div>
+              </div>
+              <div class="mov-tv-info-row">
+                <span class="mov-tv-info-icon">🏷️</span>
+                <div>
+                  <span class="mov-tv-info-label">Marca / Modelo</span>
+                  <span class="mov-tv-info-val" id="movTVInfoMarca">—</span>
+                </div>
+              </div>
+              <div class="mov-tv-info-row">
+                <span class="mov-tv-info-icon">🔑</span>
+                <div>
+                  <span class="mov-tv-info-label">Serial</span>
+                  <span class="mov-tv-info-val" id="movTVInfoSerial">—</span>
+                </div>
+              </div>
+              <div class="mov-tv-info-row">
+                <span class="mov-tv-info-icon">📍</span>
+                <div>
+                  <span class="mov-tv-info-label">Ubicación actual</span>
+                  <span class="mov-tv-info-val" id="movTVInfoUbicacion">—</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Acta generada (aparece al llenar motivo) -->
+            <div id="movActaContainer" style="display:none; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed var(--border);">
+            </div>
+          </div>
+
+          <!-- Placeholder cuando no hay TV seleccionado -->
+          <div id="movTVPlaceholder" class="mov-tv-placeholder">
+            <div class="mov-tv-placeholder-icon">📺</div>
+            <p>Selecciona un TV para ver<br>su información y foto</p>
+          </div>
+
+        </div>
+
+        <!-- ═══ PANEL DERECHO: Detalles del movimiento ═══ -->
+        <div class="mov-panel-right" style="position: relative;" id="movPanelRight">
+          <!-- Overlay de bloqueo cuando no hay TV seleccionado -->
+          <div id="movPanelOverlay" class="mov-panel-overlay">
+            <div class="mov-panel-overlay-inner">
+              <span style="font-size:2.5rem;opacity:0.35;">🔒</span>
+              <p>Selecciona un TV en el panel izquierdo<br>para habilitar esta sección</p>
+            </div>
+          </div>
+          <button type="button" class="mov-close-btn" onclick="resetFormMovimiento(); showPage('dashboard')" title="Salir">✕</button>
+
+          <div class="mov-panel-header">
+            <span class="mov-panel-icon">🔄</span>
+            <div>
+              <div class="mov-panel-title">Registrar Movimiento</div>
+              <div class="mov-panel-sub">Completa los detalles del traslado</div>
+            </div>
+          </div>
+
+          <!-- Sección: Tipo de Movimiento (tarjetas visuales) -->
+          <div class="mov-section">
+            <div class="mov-section-label">Tipo de Movimiento <span class="required">*</span></div>
+            <div class="mov-tipo-cards" id="movTipoCards">
+              <button type="button" class="mov-tipo-btn" data-val="traslado_hab">
+                <span class="mov-tipo-ico">🏨</span>
+                <span class="mov-tipo-txt">Traslado Habitación</span>
+              </button>
+              <button type="button" class="mov-tipo-btn" data-val="entrada_taller">
+                <span class="mov-tipo-ico">🔧</span>
+                <span class="mov-tipo-txt">Envío a Taller</span>
+              </button>
+              <button type="button" class="mov-tipo-btn" data-val="retorno_taller">
+                <span class="mov-tipo-ico">✅</span>
+                <span class="mov-tipo-txt">Retorno de Taller</span>
+              </button>
+              <button type="button" class="mov-tipo-btn" data-val="baja">
+                <span class="mov-tipo-ico">❌</span>
+                <span class="mov-tipo-txt">Dar de Baja</span>
+              </button>
+              <button type="button" class="mov-tipo-btn" data-val="reingreso">
+                <span class="mov-tipo-ico">♻️</span>
+                <span class="mov-tipo-txt">Reingreso</span>
+              </button>
+              <button type="button" class="mov-tipo-btn" data-val="otro">
+                <span class="mov-tipo-ico">📝</span>
+                <span class="mov-tipo-txt">Otro</span>
+              </button>
+            </div>
+            <!-- Select oculto para mantener compatibilidad con el JS existente -->
+            <select id="movTipo" required style="display:none;"></select>
+          </div>
+
+          <!-- Sección: Flujo Origen → Destino -->
+          <div class="mov-section">
+            <div class="mov-section-label">Recorrido del TV</div>
+            <div class="mov-ruta">
+              <div class="mov-ruta-box">
+                <div class="mov-ruta-tag">ORIGEN</div>
+                <input type="text" id="movOrigen" readonly class="mov-ruta-select" value="Sin TV seleccionado" />
+              </div>
+              <div class="mov-ruta-arrow">
+                <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                  <path d="M6 14h16M16 8l6 6-6 6" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div class="mov-ruta-box">
+                <div class="mov-ruta-tag mov-ruta-tag-dest">DESTINO</div>
+                <input type="text" id="movDestino" readonly class="mov-ruta-select" value="" />
+                <select id="movDestinoSelect" class="mov-ruta-select" style="display:none;"></select>
+              </div>
+            </div>
+            <!-- N° Habitación + Destino TV saliente lado a lado -->
+            <div id="grpMovDestinoHab" class="mov-hab-wrap" style="display:none;">
+              <div style="display:flex; gap:1rem; align-items:flex-start; flex-wrap:wrap;">
+                <div style="flex:1; min-width:140px;">
+                  <label for="movDestinoHab" class="mov-field-label">Número de Habitación <span class="required">*</span></label>
+                  <input type="text" id="movDestinoHab" placeholder="Ej: 5001" class="mov-hab-input" />
+                  <small id="movDestinoHabAviso" class="mov-hab-aviso" style="display:none;"></small>
+                </div>
+                <div id="grpMovTvSaliente" style="flex:1.5; min-width:220px;">
+                  <label class="mov-field-label">📍 ¿A dónde va el TV saliente? <span class="required">*</span></label>
+                  <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                    <button type="button" class="mov-tipo-btn mov-tv-saliente-btn" data-val="taller" onclick="selectTvSaliente('taller')" style="font-size:0.8rem; padding:0.5rem 0.9rem; background:rgba(255,183,77,0.15); border:1.5px solid rgba(255,183,77,0.4); color:#ffb74d;">
+                      🔧 Taller
+                    </button>
+                    <button type="button" class="mov-tipo-btn mov-tv-saliente-btn" data-val="baja" onclick="selectTvSaliente('baja')" style="font-size:0.8rem; padding:0.5rem 0.9rem; background:rgba(255,107,107,0.15); border:1.5px solid rgba(255,107,107,0.4); color:#ff6b6b;">
+                      ❌ Baja
+                    </button>
+                    <button type="button" class="mov-tipo-btn mov-tv-saliente-btn" data-val="otro" onclick="selectTvSaliente('otro')" style="font-size:0.8rem; padding:0.5rem 0.9rem; background:rgba(0,212,255,0.15); border:1.5px solid rgba(0,212,255,0.4); color:var(--accent);">
+                      📝 Otro
+                    </button>
+                  </div>
+                  <input type="text" id="movTvSalienteOtro" placeholder="Especificar destino del TV saliente..." style="display:none; margin-top:0.5rem; width:100%;" />
+                  <input type="hidden" id="movTvSaliente" value="" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sección: Fecha y Responsable (2 columnas) -->
+          <div class="mov-section">
+            <div class="mov-2col">
+              <div class="mov-field-block">
+                <label for="movFecha" class="mov-field-label">📅 Fecha y Hora <span style="font-size:0.65rem;color:var(--text-muted);font-weight:400;margin-left:4px;">(vacío = desconocida)</span></label>
+                <div style="position:relative;display:flex;gap:0.4rem;align-items:center;">
+                  <input type="datetime-local" id="movFecha" required style="width:100%;" />
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('movFecha').value='';showToast('Fecha marcada como desconocida','info');" title="Limpiar fecha (se guardará como desconocida)" style="flex-shrink:0;padding:0.4rem 0.6rem;">✕</button>
+                </div>
+              </div>
+              <div class="mov-field-block">
+                <label class="mov-field-label">👤 Responsables <span class="required">*</span></label>
+                <div style="display:flex;flex-direction:column;gap:0.4rem;">
+                  <input type="text" class="mov-resp-input" placeholder="Responsable 1 (obligatorio)" required style="width:100%;" />
+                  <input type="text" class="mov-resp-input" placeholder="Responsable 2 (opcional)" style="width:100%;" />
+                  <input type="text" class="mov-resp-input" placeholder="Responsable 3 (opcional)" style="width:100%;" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sección: Motivo -->
+          <div class="mov-section">
+            <div class="mov-field-block">
+              <label for="movMotivo" class="mov-field-label">📋 Motivo / Descripción <span class="required">*</span></label>
+              <textarea id="movMotivo" rows="3" placeholder="Descripción detallada del movimiento…" required style="width:100%;"></textarea>
+            </div>
+          </div>
+
+          <!-- Acciones -->
+          <div class="mov-actions">
+            <button type="button" class="btn btn-secondary" onclick="resetFormMovimiento()">
+              ✖ Limpiar
+            </button>
+            <button type="submit" class="btn btn-primary mov-btn-submit">
+              💾 Registrar Movimiento
+            </button>
+          </div>
+
+        </div><!-- end panel-right -->
+      </form>
+    </section>
+
+
+    <!-- PAGE: HISTORIAL GLOBAL -->
+    <section class="page" id="page-historial">
+      <div class="page-toolbar">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="searchHistorial" placeholder="Buscar en historial…" />
+        </div>
+        <div class="filter-group">
+          <select id="filterTipoMov">
+            <option value="">Todos los tipos</option>
+            <option value="traslado_hab">Traslado habitación</option>
+            <option value="entrada_taller">Envío a taller</option>
+            <option value="retorno_taller">Retorno de taller</option>
+            <option value="baja">Baja</option>
+            <option value="reingreso">Reingreso</option>
+            <option value="otro">Otro</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>TV Código</th>
+              <th>Habitación</th>
+              <th>Tipo</th>
+              <th>Destino</th>
+              <th>Responsable</th>
+              <th>Motivo</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="historialBody">
+            <tr><td colspan="8" class="empty-state">No hay movimientos registrados.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- PAGE: NUEVO TV -->
+    <section class="page" id="page-nuevo-tv">
+      <div class="form-container">
+        <div class="card">
+          <div class="card-header">
+            <h2 id="formTVTitle">📺 Registrar Nuevo TV</h2>
+          </div>
+          <div class="card-body">
+            <form id="formTV" novalidate autocomplete="off">
+              <input type="hidden" id="tvId" />
+              
+              <!-- SECCIÓN 1: DETALLES GENERALES Y TÉCNICOS -->
+              <div class="form-section">
+                <div class="form-section-title">
+                  <span class="form-section-icon">⚙️</span>
+                  <h3>Detalles Técnicos y de Identificación</h3>
+                </div>
+                <div class="form-grid-cols">
+                  <div class="form-group form-group-col-3">
+                    <label for="tvCodigo">Código Interno <span class="required">*</span></label>
+                    <input type="text" id="tvCodigo" placeholder="Ej: TV-001" required readonly />
+                  </div>
+
+                  <div class="form-group form-group-col-3">
+                    <label for="tvMarca">Marca <span class="required">*</span></label>
+                    <select id="tvMarca" required>
+                      <!-- Opciones generadas por JS -->
+                    </select>
+                  </div>
+                  
+                  <div class="form-group form-group-col-3" id="grpMarcaOtro" style="display: none;">
+                    <label for="tvMarcaOtro">Nueva Marca <span class="required">*</span></label>
+                    <input type="text" id="tvMarcaOtro" placeholder="Especifique la nueva marca" />
+                  </div>
+
+                  <div class="form-group form-group-col-3">
+                    <label for="tvModelo">Modelo <span class="required">*</span></label>
+                    <input type="text" id="tvModelo" placeholder="Ej: UN43T5202" required />
+                  </div>
+
+                  <div class="form-group form-group-col-3">
+                    <label for="tvSerial">Número de Serie <span class="required">*</span></label>
+                    <input type="text" id="tvSerial" placeholder="Ej: SN123456789" required />
+                  </div>
+
+                  <div class="form-group form-group-col-3">
+                    <label for="tvTamano">Tamaño de Pantalla</label>
+                    <select id="tvTamano">
+                      <option value="">-- Seleccionar --</option>
+                      <option value="24 pulgadas">24 pulgadas</option>
+                      <option value="32 pulgadas">32 pulgadas</option>
+                      <option value="40 pulgadas">40 pulgadas</option>
+                      <option value="42 pulgadas" selected>42 pulgadas</option>
+                      <option value="43 pulgadas">43 pulgadas</option>
+                      <option value="50 pulgadas">50 pulgadas</option>
+                      <option value="55 pulgadas">55 pulgadas</option>
+                      <option value="65 pulgadas">65 pulgadas</option>
+                      <option value="75 pulgadas">75 pulgadas</option>
+                      <option value="85 pulgadas">85 pulgadas</option>
+                      <option value="Otro">Otro</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group form-group-col-3">
+                    <label for="tvTipo">Tipo de Panel</label>
+                    <select id="tvTipo">
+                      <option value="">-- Seleccionar --</option>
+                      <option value="LED">LED</option>
+                      <option value="OLED">OLED</option>
+                      <option value="QLED">QLED</option>
+                      <option value="LCD">LCD</option>
+                      <option value="Plasma">Plasma</option>
+                      <option value="Otro">Otro</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group form-group-col-3">
+                    <label for="tvResolucion">Resolución</label>
+                    <select id="tvResolucion">
+                      <option value="">-- Seleccionar --</option>
+                      <option value="HD">HD (720p)</option>
+                      <option value="Full HD">Full HD (1080p)</option>
+                      <option value="4K">4K UHD</option>
+                      <option value="8K">8K</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group form-group-col-3">
+                    <label for="tvSmartTV">Smart TV</label>
+                    <select id="tvSmartTV">
+                      <option value="si">Sí</option>
+                      <option value="no">No</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <!-- SECCIÓN 2: UBICACIÓN Y ESTADO -->
+              <div class="form-section">
+                <div class="form-section-title">
+                  <span class="form-section-icon">📍</span>
+                  <h3>Ubicación e Ingreso</h3>
+                </div>
+                <div class="form-grid-cols">
+                  <div class="form-group form-group-col-4">
+                    <label for="tvFechaIngreso">Fecha de Ingreso al Hotel</label>
+                    <div style="position:relative; display:flex; align-items:center;">
+                      <input type="text" id="tvFechaIngreso" placeholder="YYYY-MM-DD o 00" style="width:100%; padding-right:2rem;" />
+                      <button type="button" id="btnClearFechaIngreso" title="Marcar como desconocida" style="position:absolute; right:6px; background:none; border:none; color:#ff4d6d; font-size:1.1rem; font-weight:700; cursor:pointer; padding:2px 6px; border-radius:4px; line-height:1; display:flex; align-items:center; justify-content:center;">✕</button>
+                    </div>
+                  </div>
+
+                  <div class="form-group form-group-col-4">
+                    <label for="tvUbicacion">Ubicación <span class="required">*</span></label>
+                    <select id="tvUbicacion" required>
+                      <!-- Opciones generadas por JS -->
+                    </select>
+                  </div>
+
+                  <div class="form-group form-group-col-4" id="grpUbicacionOtro" style="display: none;">
+                    <label for="tvUbicacionOtro">Nueva Ubicación <span class="required">*</span></label>
+                    <input type="text" id="tvUbicacionOtro" placeholder="Especifique la nueva ubicación" />
+                  </div>
+
+                  <div class="form-group form-group-col-4" id="grpTvHabitacion" style="display: none;">
+                    <label for="tvHabitacion">N° Habitación <span class="required">*</span></label>
+                    <input type="text" id="tvHabitacion" placeholder="Ej: 5001" />
+                    <small id="tvHabitacionAviso" class="mov-hab-aviso" style="display:none;"></small>
+                  </div>
+
+                  <div class="form-group form-group-col-4">
+                    <label for="tvEstado">Estado Actual <span class="required">*</span></label>
+                    <select id="tvEstado" required>
+                      <option value="operativo">Operativo</option>
+                      <option value="inoperativo">Inoperativo</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <!-- SECCIÓN 3: MULTIMEDIA -->
+              <div class="form-section">
+                <div class="form-section-title">
+                  <span class="form-section-icon">📷</span>
+                  <h3>Registro Fotográfico (Etiqueta Trasera)</h3>
+                </div>
+                <div class="form-grid-cols">
+                  <div class="form-group form-group-col-12">
+                    <label>Foto de Etiqueta (Trasera)</label>
+                    <div class="custom-file-upload">
+                      <input type="file" id="tvImagenTrasera" accept="image/*" class="file-input-hidden" />
+                      <label for="tvImagenTrasera" class="file-upload-label" id="labelTrasera">
+                        <div class="upload-prompt">
+                          <span class="upload-icon">🏷️</span>
+                          <span class="upload-text">Subir Foto de Etiqueta</span>
+                          <span class="upload-sub">Arrastra o haz clic aquí</span>
+                        </div>
+                        <div id="previewTrasera" class="preview-container"></div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- SECCIÓN 4: OBSERVACIONES -->
+              <div class="form-section">
+                <div class="form-section-title">
+                  <span class="form-section-icon">📝</span>
+                  <h3>Observaciones Adicionales</h3>
+                </div>
+                <div class="form-grid-cols">
+                  <div class="form-group form-group-col-12">
+                    <label for="tvObservaciones">Observaciones</label>
+                    <textarea id="tvObservaciones" rows="3" placeholder="Notas adicionales sobre el TV…"></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="cancelarFormTV()">Cancelar</button>
+                <button type="submit" class="btn btn-primary" id="btnGuardarTV">💾 Guardar TV</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAGE: ASIGNAR TV -->
+    <section class="page" id="page-asignar-tv">
+      <div class="form-container">
+        <div class="card">
+          <div class="card-header">
+            <h2>📌 Asignar TV</h2>
+          </div>
+          <div class="card-body">
+            <p class="empty-state">Módulo para asignar televisores (en construcción).</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- end main-wrapper -->
+
+  <!-- MODAL: DETALLE TV -->
+  <div class="modal-overlay" id="modalDetalle">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modalDetalleTitle">Detalle del TV</h3>
+        <button class="modal-close" onclick="closeModal('modalDetalle')">✕</button>
+      </div>
+      <div class="modal-body" id="modalDetalleBody"></div>
+    </div>
+  </div>
+
+  <!-- MODAL: CONFIRMAR ELIMINAR -->
+  <div class="modal-overlay" id="modalConfirm">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h3>Confirmar eliminación</h3>
+        <button class="modal-close" onclick="closeModal('modalConfirm')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p>¿Estás seguro de que deseas eliminar este TV y todo su historial? Esta acción no se puede deshacer.</p>
+        <div class="form-actions" style="margin-top:1.5rem;">
+          <button class="btn btn-secondary" onclick="closeModal('modalConfirm')">Cancelar</button>
+          <button class="btn btn-danger" id="btnConfirmDelete">Eliminar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CONFIRMAR ELIMINACIÓN FÍSICA (Solo Admin) -->
+  <div class="modal-overlay" id="modalPhysicalDelete">
+    <div class="modal modal-sm">
+      <div class="modal-header" style="background:rgba(255,77,109,0.15); border-bottom-color:rgba(255,77,109,0.3);">
+        <h3 style="color:#ff4d6d;">⚠️ Eliminación Física</h3>
+        <button class="modal-close" onclick="closeModal('modalPhysicalDelete')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="background:rgba(255,77,109,0.1); border:1px solid rgba(255,77,109,0.3); border-radius:8px; padding:12px; margin-bottom:1rem;">
+          <p style="font-weight:700; color:#ff4d6d; margin-bottom:4px;">🛡️ Acción de Administrador</p>
+          <p style="font-size:0.85rem; color:var(--text-secondary);">Esta acción eliminará permanentemente el registro de la base de datos. No se podrá recuperar.</p>
+        </div>
+        <p>¿Estás seguro de que deseas eliminar este TV <strong>permanentemente</strong>?</p>
+        <div class="form-actions" style="margin-top:1.5rem;">
+          <button class="btn btn-secondary" onclick="closeModal('modalPhysicalDelete')">Cancelar</button>
+          <button class="btn btn-danger" id="btnConfirmPhysicalDelete">🗑️ Eliminar Permanentemente</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CONFIRMAR SERIAL -->
+  <div class="modal-overlay" id="modalConfirmSerial">
+    <div class="modal modal-sm" style="text-align: center; background: #ffffff; border-color: rgba(0,0,0,0.1);">
+      <div class="modal-header" style="justify-content: center; border-bottom: none; padding-bottom: 0; background: transparent;">
+        <h3 class="blink-red" style="font-size: 1.25rem; color: #dc2626; text-shadow: none;">Atención....</h3>
+      </div>
+      <div class="modal-body">
+        <p id="modalConfirmSerialMsg" style="font-size: 1.05rem; margin-bottom: 1rem; color: #1e293b;"></p>
+        <div class="form-actions" style="justify-content: center; gap: 1rem;">
+          <button class="btn btn-primary" id="btnConfirmSerialAceptar" style="min-width: 100px;">Aceptar</button>
+          <button class="btn btn-secondary" onclick="closeModal('modalConfirmSerial')" style="min-width: 100px; background: #e2e8f0; color: #334155;">Cancelar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ASIGNAR TV A HABITACIÓN -->
+  <div class="modal-overlay" id="modalAsignar">
+    <div class="modal modal-sm" style="background: #ffffff; border-color: rgba(0,0,0,0.1);">
+      <div class="modal-header" style="background: transparent; border-bottom-color: #e5e7eb;">
+        <h3 style="color: #1e293b; text-shadow: none;">Asignación de TV</h3>
+        <button class="modal-close" onclick="closeModal('modalAsignar')" style="background: #ef4444; border-color: #dc2626; color: #fff;">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="background: linear-gradient(135deg, #e0f2fe, #bae6fd); border: 2px solid #38bdf8; padding: 1rem; border-radius: var(--radius-sm); margin-bottom: 1.25rem; display: flex; gap: 1rem; align-items: center;">
+          <div style="flex: 1;">
+            <span style="font-size: 0.72rem; font-weight: 700; color: #000; text-transform: uppercase; display: block; margin-bottom: 0.25rem;">Televisor a asignar:</span>
+            <div id="asignarTvInfo" style="color: #000; font-size: 0.95rem; font-weight: 700;">—</div>
+          </div>
+          <div id="asignarTvImgContainer" style="display: none; width: 60px; height: 60px; border-radius: 4px; overflow: hidden; border: 2px solid #38bdf8; flex-shrink: 0; background: #f0f9ff;">
+            <img id="asignarTvImg" src="" alt="Etiqueta" style="width: 100%; height: 100%; object-fit: cover; cursor: zoom-in;" title="Doble clic para ampliar" />
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 1rem; align-items: flex-start;">
+          <div class="form-group">
+            <label for="asignarFechaIngreso" style="color: #000000;">📅 Fecha y Hora de Ingreso</label>
+            <div style="position:relative; display:flex; align-items:center;">
+              <input type="datetime-local" id="asignarFechaIngreso" style="width:100%; padding-right:2.2rem; background: #e0f2fe; border-color: #7dd3fc; color: #1e293b;" />
+              <button type="button" id="btnClearAsignarFecha" title="Marcar como desconocida" style="position:absolute; right:6px; background:#ef4444; border:none; color:#fff; font-size:0.9rem; font-weight:700; cursor:pointer; width:26px; height:26px; border-radius:6px; display:flex; align-items:center; justify-content:center;">✕</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="asignarArea" style="color: #000000;">Área</label>
+            <select id="asignarArea" style="background: #e0f2fe; border-color: #7dd3fc; color: #1e293b;">
+              <!-- Generado dinámicamente en app.js -->
+            </select>
+          </div>
+          <div class="form-group" id="grpAsignarHabNumero" style="display: none;">
+            <label for="asignarHabNumero" style="color: #000000;">Número de Habitación <span class="required">*</span></label>
+            <select id="asignarHabNumero" required disabled style="background: #e0f2fe; border-color: #7dd3fc; color: #1e293b;">
+              <option value="">-- Seleccionar Habitación --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="asignarResponsable" style="color: #000000;">Responsables <span class="required">*</span></label>
+            <input type="text" id="asignarResponsable" placeholder="Responsable 1 (obligatorio)" required class="asignar-resp-input" style="background: #e0f2fe; border-color: #7dd3fc; color: #1e293b;" />
+            <input type="text" placeholder="Responsable 2 (opcional)" class="asignar-resp-input" style="width:100%; margin-top:0.5rem; background: #e0f2fe; border-color: #7dd3fc; color: #1e293b;" />
+            <input type="text" placeholder="Responsable 3 (opcional)" class="asignar-resp-input" style="width:100%; margin-top:0.5rem; background: #e0f2fe; border-color: #7dd3fc; color: #1e293b;" />
+          </div>
+          <div class="form-group full-width">
+            <label for="asignarNota" style="color: #000000;">Nota de Asignación / Motivo</label>
+            <textarea id="asignarNota" rows="2" placeholder="Ej: Traslado por reparación completada o reubicación..." style="background: #e0f2fe; border-color: #7dd3fc; color: #1e293b;"></textarea>
+          </div>
+        </div>
+        <div class="form-actions" style="margin-top: 1.5rem;">
+          <button class="btn btn-secondary" onclick="closeModal('modalAsignar')" style="background: #e2e8f0; color: #334155;">Cancelar</button>
+          <button class="btn btn-assign" id="btnConfirmAsignar" style="background: #4f46e5; color: #fff;">📌 Asignar TV</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: REUBICAR TV EXISTENTE -->
+  <div class="modal-overlay" id="modalReemplazo">
+    <div class="modal" style="max-width:520px;">
+      <div class="modal-header">
+        <h3>📺 Reubicar TV Existente</h3>
+        <button class="modal-close" onclick="cancelarReemplazo()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="reloc-alert">
+          <span class="reloc-alert-icon">⚠️</span>
+          <p id="reemplazoInfo" class="reloc-alert-text"></p>
+        </div>
+        <p class="reloc-question">¿A dónde se reubica este TV?</p>
+        <div class="reloc-grid">
+          <button class="reloc-card reloc-taller" onclick="seleccionarReemplazo('Taller')">
+            <span class="reloc-icon">🔧</span>
+            <div class="reloc-label"><strong>Taller</strong><br><small>Envío a reparación</small></div>
+          </button>
+          <button class="reloc-card reloc-almacen" onclick="seleccionarReemplazo('Almacén')">
+            <span class="reloc-icon">📦</span>
+            <div class="reloc-label"><strong>Almacén</strong><br><small>Guardado en inventario</small></div>
+          </button>
+          <button class="reloc-card reloc-baja" onclick="seleccionarReemplazo('Baja')">
+            <span class="reloc-icon">❌</span>
+            <div class="reloc-label"><strong>Dado de Baja</strong><br><small>Retiro del servicio</small></div>
+          </button>
+          <button class="reloc-card reloc-otro" onclick="seleccionarReemplazo('Otro')">
+            <span class="reloc-icon">📝</span>
+            <div class="reloc-label"><strong>Otro</strong><br><small>Especificar destino</small></div>
+          </button>
+        </div>
+        <div id="reemplazoOtroGroup" style="display:none; margin-top:1rem;">
+          <input type="text" id="reemplazoOtroInput" placeholder="Especificar destino..." style="width:100%;" />
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-secondary" onclick="cancelarReemplazo()">Cancelar</button>
+        <button class="btn btn-primary" id="btnConfirmarReemplazo" onclick="confirmarReemplazo()">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CONFIRMAR ELIMINAR MOVIMIENTO (Admin) -->
+  <div class="modal-overlay" id="modalConfirmMov">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h3>🗑️ Eliminar Movimiento</h3>
+        <button class="modal-close" onclick="closeModal('modalConfirmMov')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p>¿Estás seguro de que deseas eliminar este registro de movimiento? Esta acción no se puede deshacer.</p>
+        <div class="form-actions" style="margin-top:1.5rem;">
+          <button class="btn btn-secondary" onclick="closeModal('modalConfirmMov')">Cancelar</button>
+          <button class="btn btn-danger" id="btnConfirmDeleteMov">Eliminar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: MODIFICAR SERIAL TV (Admin) -->
+  <div class="modal-overlay" id="modalChangeSerial">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h3>🔑 Modificar Serial TV</h3>
+        <button class="modal-close" onclick="closeModal('modalChangeSerial')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="background:rgba(0,212,255,0.08); border:1px solid rgba(0,212,255,0.3); border-radius:8px; padding:12px; margin-bottom:1rem;">
+          <span style="font-size:0.75rem; color:var(--text-secondary); text-transform:uppercase; font-weight:600;">Serial Actual:</span>
+          <div id="serialOldValue" style="font-size:1rem; font-weight:700; color:var(--accent); margin-top:4px; font-family:monospace;">—</div>
+        </div>
+        <div class="form-group">
+          <label style="color:var(--text-secondary); font-size:0.8rem;">Nuevo Serial <span style="color:var(--danger)">*</span></label>
+          <input type="text" id="serialNewValue" placeholder="Ingrese el nuevo número de serie" style="width:100%;" />
+        </div>
+        <div class="form-actions" style="margin-top:1rem;">
+          <button class="btn btn-secondary" onclick="closeModal('modalChangeSerial')">Cancelar</button>
+          <button class="btn btn-primary" id="btnConfirmSerial">Modificar Serial</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ELIMINAR TODOS LOS DATOS (Admin) -->
+  <div class="modal-overlay" id="modalDeleteAll">
+    <div class="modal modal-sm">
+      <div class="modal-header" style="background:rgba(255,77,109,0.1); border-bottom-color:rgba(255,77,109,0.3);">
+        <h3 style="color:#ff4d6d;">💣 Eliminar Todos los Datos</h3>
+        <button class="modal-close" onclick="closeModal('modalDeleteAll')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="background:rgba(255,77,109,0.08); border:1px solid rgba(255,77,109,0.3); border-radius:8px; padding:14px; margin-bottom:1rem;">
+          <p style="font-weight:700; color:#ff4d6d; margin-bottom:6px;">⚠️ PELIGRO: Esta acción es irreversible</p>
+          <p style="font-size:0.85rem; color:var(--text-secondary);">Se eliminarán TODOS los TVs, movimientos, configuración e imágenes de actas de la base de datos.</p>
+        </div>
+        <div class="form-group">
+          <label style="color:var(--text-secondary); font-size:0.8rem;">Escriba <strong style="color:#ff4d6d;">ELIMINAR</strong> para confirmar</label>
+          <input type="text" id="deleteAllConfirmText" placeholder="ELIMINAR" style="width:100%;" />
+        </div>
+        <div class="form-actions" style="margin-top:1rem;">
+          <button class="btn btn-secondary" onclick="closeModal('modalDeleteAll')">Cancelar</button>
+          <button class="btn btn-danger" id="btnConfirmDeleteAll">💣 Eliminar Todo</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: LIGHTBOX ZOOM IMAGEN -->
+  <div class="modal-overlay" id="modalZoom" style="background: rgba(0,0,0,0.9); z-index: 300;">
+    <div style="position: absolute; top: 1.5rem; right: 1.5rem; display: flex; gap: 0.5rem;">
+      <button class="modal-close" onclick="closeModal('modalZoom')" style="background: rgba(255,255,255,0.1); color: #fff; width: 40px; height: 40px; border-radius: 50%; font-size: 1.5rem; transition: var(--transition);">✕</button>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; padding: 2rem;" onclick="closeModal('modalZoom')">
+      <img id="zoomImgSource" src="" tabindex="0" style="max-width: 90%; max-height: 80vh; object-fit: contain; border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.1); margin-bottom: 1rem; transform: scale(0.95); transition: transform 0.3s cubic-bezier(.4,0,.2,1);" onclick="event.stopPropagation()" />
+      <h4 id="zoomImgTitle" style="color: #fff; font-size: 1rem; font-weight: 600; text-shadow: 0 2px 4px rgba(0,0,0,0.5); font-family: 'Inter', sans-serif;">—</h4>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div class="toast" id="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
