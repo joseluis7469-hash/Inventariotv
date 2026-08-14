@@ -2563,8 +2563,9 @@ document.getElementById('formMovimiento').addEventListener('submit', async e => 
 
 // ─── HISTORIAL GLOBAL ─────────────────────────────────────────
 function renderHistorial(filtroTipo = '', busqueda = '') {
-  const tvs  = loadTVs();
-  let movs = loadMovs().sort((a, b) => {
+  // El admin ve TODOS los registros (incluidos eliminados y eventos)
+  const tvs  = isAdmin() ? loadAllTVs() : loadTVs();
+  let movs = (isAdmin() ? loadAllMovs() : loadMovs()).sort((a, b) => {
     const fa = a.fecha || '';
     const fb = b.fecha || '';
     const aDesconocida = fa.includes('desconocida') || !fa;
@@ -2590,6 +2591,7 @@ function renderHistorial(filtroTipo = '', busqueda = '') {
   tbody.innerHTML = movs.map(m => {
     const tv = tvs.find(t => String(t.id) === String(m.tvId));
     const esEvento = m.esEvento === true;
+    const eliminado = m.deleted === true;
     const codigoMostrar = esEvento ? (m.codigo || '—') : (tv?.codigo || '—');
     const hasActa = !esEvento && tv && (m.actaUrl || m.tipo);
     const actaBtn = hasActa ? `<span class="ml-acta-icon" title="Ver acta" style="cursor:pointer; font-size:0.85rem; opacity:0.7; margin-left:4px;" onclick="event.stopPropagation(); openActaFromMov(event, '${m.id}')">📄</span>` : '';
@@ -2597,9 +2599,12 @@ function renderHistorial(filtroTipo = '', busqueda = '') {
     const physDelBtn = !esEvento && hasPermission('eliminar_fisico_movimiento') && m.deleted ? `<button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); confirmarEliminacionFisicaMovimiento('${m.id}')" title="Eliminar permanentemente" style="font-size:0.7rem; padding:2px 6px; background:rgba(255,77,109,0.2); border-color:rgba(255,77,109,0.5);">💀</button>` : '';
     const actaDelBtn = !esEvento && hasPermission('eliminar_fisico_acta') && m.actaUrl ? `<button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); confirmarEliminarActaMovimiento('${m.id}')" title="Eliminar acta" style="font-size:0.7rem; padding:2px 6px; background:rgba(255,165,0,0.15); border-color:rgba(255,165,0,0.4); color:#ff9500;">📄✕</button>` : '';
     const actionsHtml = logDelBtn || physDelBtn || actaDelBtn ? `<div class="actions-cell" style="gap:4px;">${logDelBtn}${physDelBtn}${actaDelBtn}</div>` : '—';
-    return `<tr tabindex="0" data-tvid="${m.tvId || ''}" data-movid="${m.id || ''}" style="${esEvento ? 'background:rgba(99,179,237,0.05);' : ''}">
+    const badge = esEvento
+      ? '<span style="margin-left:4px; font-size:0.65rem; background:rgba(99,179,237,0.2); color:var(--accent); border:1px solid rgba(99,179,237,0.3); border-radius:4px; padding:1px 5px;">EVENTO</span>'
+      : (eliminado ? '<span style="margin-left:4px; font-size:0.65rem; background:rgba(255,77,109,0.2); color:#ff4d6d; border:1px solid rgba(255,77,109,0.4); border-radius:4px; padding:1px 5px;">ELIMINADO</span>' : '');
+    return `<tr tabindex="0" data-tvid="${m.tvId || ''}" data-movid="${m.id || ''}" style="${esEvento ? 'background:rgba(99,179,237,0.05);' : (eliminado ? 'background:rgba(255,77,109,0.06);' : '')}">
       <td style="font-size:0.78rem;white-space:nowrap">${fmtDate(m.fecha)}</td>
-      <td><strong style="color:var(--accent)">${codigoMostrar}</strong>${esEvento ? '<span style="margin-left:4px; font-size:0.65rem; background:rgba(99,179,237,0.2); color:var(--accent); border:1px solid rgba(99,179,237,0.3); border-radius:4px; padding:1px 5px;">EVENTO</span>' : ''}${actaBtn}</td>
+      <td><strong style="color:var(--accent)">${codigoMostrar}</strong>${badge}${actaBtn}</td>
       <td>${tv?.habitacion || '—'}</td>
       <td>${tipoLabel[m.tipo] || m.tipo}</td>
       <td>${m.habDestino ? 'Hab. ' + m.habDestino : '—'}</td>
