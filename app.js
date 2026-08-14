@@ -8,15 +8,15 @@ const DB_TVS  = 'hpa_tvs';
 const DB_MOVS = 'hpa_movimientos';
 
 // Funciones de carga que filtran registros eliminados lógicamente
+// Por defecto nadie ve los eliminados. El admin puede activar "Ver eliminados".
 function loadTVs()   {
   const tvs = window.appData.tvs || [];
-  // Admin ve todos, otros usuarios ven solo los no eliminados
-  if (isAdmin()) return tvs;
+  if (isAdmin() && window.mostrarEliminados) return tvs;
   return tvs.filter(t => !t.deleted);
 }
 function loadMovs()  {
   const movs = window.appData.movimientos || [];
-  if (isAdmin()) return movs;
+  if (isAdmin() && window.mostrarEliminados) return movs;
   return movs.filter(m => !m.deleted);
 }
 // Función para admin que carga todos (incluyendo eliminados)
@@ -55,6 +55,12 @@ function showPage(id) {
       navUsuarios.style.pointerEvents = 'none';
       navUsuarios.style.opacity = '0.4';
     }
+  }
+
+  // Mostrar/ocultar herramientas de admin en el inventario según permisos
+  const adminInvTools = document.getElementById('adminInvTools');
+  if (adminInvTools) {
+    adminInvTools.style.display = hasPermission('eliminar_base_datos') ? 'flex' : 'none';
   }
 
   if (id === 'dashboard')   renderDashboard();
@@ -450,8 +456,8 @@ function renderInventario(filtroEstado = '', filtroUbicacion = '', busqueda = ''
   }
 
   tbody.innerHTML = tvs.map(t => `
-    <tr tabindex="0" ondblclick="verDetalle('${t.id}')" data-id="${t.id}">
-      <td><strong style="color:var(--accent)">${t.codigo}</strong></td>
+    <tr tabindex="0" ondblclick="verDetalle('${t.id}')" data-id="${t.id}" style="${t.deleted ? 'background:rgba(255,77,109,0.06);' : ''}">
+      <td><strong style="color:var(--accent)">${t.codigo}</strong>${t.deleted ? '<span style="margin-left:4px; font-size:0.65rem; background:rgba(255,77,109,0.2); color:#ff4d6d; border:1px solid rgba(255,77,109,0.4); border-radius:4px; padding:1px 5px;">ELIMINADO</span>' : ''}</td>
       <td>${t.ubicacion === 'Habitacion' ? t.habitacion : (t.ubicacion || '—')}</td>
       <td>${t.marca}</td>
       <td>${t.modelo}</td>
@@ -908,6 +914,90 @@ function setupDeleteAllListener() {
   });
 }
 setupDeleteAllListener();
+
+// ─── ELIMINACIÓN POR GRUPO (Solo Admin) ───────────────────────
+function toggleVerEliminados() {
+  window.mostrarEliminados = document.getElementById('chkVerEliminados').checked;
+  renderInventario();
+}
+
+function abrirEliminarPorGrupo() {
+  if (!hasPermission('eliminar_base_datos')) {
+    showToast('No tienes permiso para eliminar registros.', 'error');
+    return;
+  }
+  document.getElementById('grupoEliminarConfirm').value = '';
+  document.getElementById('grupoEliminarTipo').selectedIndex = 0;
+  actualizarInfoGrupo();
+  openModal('modalEliminarGrupo');
+}
+
+function actualizarInfoGrupo() {
+  const tipo = document.getElementById('grupoEliminarTipo').value;
+  const tvs = loadAllTVs();
+  let count = 0;
+  if (tipo === 'todos') {
+    count = tvs.length;
+  } else {
+    count = tvs.filter(t => t.estado === tipo).length;
+  }
+  const el = document.getElementById('grupoEliminarInfo');
+  if (el) el.textContent = `Se eliminarán permanentemente ${count} registro(s).`;
+}
+
+function setupEliminarGrupoListener() {
+  const sel = document.getElementById('grupoEliminarTipo');
+  if (sel) sel.addEventListener('change', actualizarInfoGrupo);
+  const btn = document.getElementById('btnConfirmEliminarGrupo');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    const confirmText = document.getElementById('grupoEliminarConfirm').value.trim();
+    if (confirmText !== 'ELIMINAR') {
+      showToast('Debe escribir "ELIMINAR" para confirmar.', 'error');
+      return;
+    }
+    const tipo = document.getElementById('grupoEliminarTipo').value;
+    const prevText = btn.textContent;
+    btn.textContent = 'Eliminando...';
+    btn.disabled = true;
+    try {
+      let tvsAEliminar = loadAllTVs();
+      if (tipo !== 'todos') tvsAEliminar = tvsAEliminar.filter(t => t.estado === tipo);
+      const ids = tvsAEliminar.map(t => t.id);
+      if (ids.length === 0) {
+        closeModal('modalEliminarGrupo');
+        showToast('No hay registros en este grupo.', 'info');
+        return;
+      }
+      // Eliminar físicamente cada TV y sus movimientos
+      for (const id of ids) {
+        await db.collection('tvs').doc(id).delete();
+      }
+      // Eliminar movimientos asociados a esos TVs
+      const movsSnap = await db.collection('movimientos').get();
+      const batch = db.batch();
+      let ops = 0;
+      movsSnap.docs.forEach(doc => {
+        const m = doc.data();
+        if (ids.includes(String(m.tvId))) {
+          batch.delete(doc.ref);
+          ops++;
+        }
+      });
+      if (ops > 0) await batch.commit();
+
+      closeModal('modalEliminarGrupo');
+      showToast(`${ids.length} registro(s) eliminados permanentemente.`, 'success');
+    } catch (e) {
+      console.error(e);
+      showToast('Error al eliminar: ' + e.message, 'error');
+    } finally {
+      btn.textContent = prevText;
+      btn.disabled = false;
+    }
+  });
+}
+setupEliminarGrupoListener();
 
 // ─── FORMULARIO TV ───────────────────────────────────────────
 function generarCodigoTV() {
@@ -2696,7 +2786,7 @@ function renderAsignarTVPage() {
               <tbody>
                 ${tvs.map(t => `
                   <tr tabindex="0" data-tvid="${t.id}">
-                    <td><strong style="color:var(--accent)">${t.codigo}</strong></td>
+      <td><strong style="color:var(--accent)">${t.codigo}</strong>${t.deleted ? '<span style="margin-left:4px; font-size:0.65rem; background:rgba(255,77,109,0.2); color:#ff4d6d; border:1px solid rgba(255,77,109,0.4); border-radius:4px; padding:1px 5px;">ELIMINADO</span>' : ''}</td>
                     <td>${t.ubicacion || '—'}</td>
                     <td>${t.marca}</td>
                     <td>${t.modelo}</td>

@@ -154,6 +154,12 @@
             <option value="baja">Dados de Baja</option>
           </select>
         </div>
+        <div id="adminInvTools" style="display:flex; gap:8px; align-items:center; margin-left:auto;">
+          <label style="display:flex; align-items:center; gap:6px; font-size:0.78rem; color:var(--text-secondary); cursor:pointer; white-space:nowrap;">
+            <input type="checkbox" id="chkVerEliminados" onchange="toggleVerEliminados()" style="accent-color:var(--danger);" /> 👁️ Ver eliminados
+          </label>
+          <button class="btn btn-danger btn-sm" onclick="abrirEliminarPorGrupo()" title="Eliminar todos o por grupo" style="white-space:nowrap;">💣 Eliminar Registros</button>
+        </div>
       </div>
 
       <!-- Botón Imprimir flotante (esquina inferior derecha) -->
@@ -707,6 +713,42 @@
         <div class="form-actions" style="margin-top:1.5rem;">
           <button class="btn btn-secondary" onclick="closeModal('modalPhysicalDelete')">Cancelar</button>
           <button class="btn btn-danger" id="btnConfirmPhysicalDelete">🗑️ Eliminar Permanentemente</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ELIMINAR POR GRUPO (Solo Admin) -->
+  <div class="modal-overlay" id="modalEliminarGrupo">
+    <div class="modal modal-sm">
+      <div class="modal-header" style="background:rgba(255,77,109,0.15); border-bottom-color:rgba(255,77,109,0.3);">
+        <h3 style="color:#ff4d6d;">💣 Eliminar Registros</h3>
+        <button class="modal-close" onclick="closeModal('modalEliminarGrupo')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="background:rgba(255,77,109,0.1); border:1px solid rgba(255,77,109,0.3); border-radius:8px; padding:12px; margin-bottom:1rem;">
+          <p style="font-weight:700; color:#ff4d6d; margin-bottom:4px;">🛡️ Acción de Administrador</p>
+          <p style="font-size:0.85rem; color:var(--text-secondary);">Selecciona un grupo y los registros se eliminarán <strong>permanentemente</strong> de la base de datos. Esta acción no se puede deshacer.</p>
+        </div>
+        <div class="form-group">
+          <label style="color:var(--text-secondary); font-size:0.8rem;">Grupo a eliminar <span style="color:var(--danger)">*</span></label>
+          <select id="grupoEliminarTipo">
+            <option value="todos">🗑️ Todos los registros</option>
+            <option value="almacen">📦 Solo en Almacén</option>
+            <option value="operativo">✅ Solo Operativos</option>
+            <option value="activo">🛏️ Solo en Habitación</option>
+            <option value="taller">🔧 Solo en Taller</option>
+            <option value="baja">❌ Solo Dados de Baja</option>
+          </select>
+        </div>
+        <div id="grupoEliminarInfo" style="font-size:0.8rem; color:var(--text-secondary); background:var(--bg-input); border:1px solid var(--border); border-radius:8px; padding:10px; margin-top:8px;"></div>
+        <div class="form-group" style="margin-top:1rem;">
+          <label style="color:var(--text-secondary); font-size:0.8rem;">Escribe <strong style="color:var(--danger)">ELIMINAR</strong> para confirmar <span style="color:var(--danger)">*</span></label>
+          <input type="text" id="grupoEliminarConfirm" placeholder="ELIMINAR" autocomplete="off" style="width:100%;" />
+        </div>
+        <div class="form-actions" style="margin-top:1.5rem;">
+          <button class="btn btn-secondary" onclick="closeModal('modalEliminarGrupo')">Cancelar</button>
+          <button class="btn btn-danger" id="btnConfirmEliminarGrupo">💣 Eliminar</button>
         </div>
       </div>
     </div>
