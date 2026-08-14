@@ -91,6 +91,12 @@ function updateSidebarUser() {
   const tbName = document.getElementById('topbarName');
   if (tbAvatar) tbAvatar.textContent = initials;
   if (tbName) tbName.textContent = u.name || u.email;
+
+  // Mostrar botón Reiniciar BD solo si tiene permiso
+  const btnReiniciar = document.getElementById('btnReiniciarBD');
+  if (btnReiniciar) {
+    btnReiniciar.style.display = (window.userPermissions || []).includes('eliminar_base_datos') ? 'block' : 'none';
+  }
 }
 
 function hasPermission(perm) {

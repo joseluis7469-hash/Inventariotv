@@ -68,6 +68,7 @@
             <div id="userDisplayRole" style="font-size:0.62rem; color:var(--accent);">—</div>
           </div>
         </div>
+        <button id="btnReiniciarBD" onclick="confirmarEliminarTodo()" style="display:none; width:100%; padding:6px; margin-bottom:6px; border:1px solid rgba(255,77,109,0.4); background:rgba(255,77,109,0.12); color:#ff4d6d; border-radius:6px; font-size:0.7rem; font-weight:600; cursor:pointer; font-family:inherit;">💣 Reiniciar Base de Datos</button>
         <button onclick="firebase.auth().signOut(); window.location.href='users.html';" style="width:100%; padding:6px; border:1px solid rgba(255,77,109,0.3); background:rgba(255,77,109,0.08); color:#ff4d6d; border-radius:6px; font-size:0.7rem; font-weight:600; cursor:pointer; font-family:inherit;">🚪 Cerrar Sesión</button>
       </div>
     </div>
@@ -441,6 +442,13 @@
             <option value="baja">Baja</option>
             <option value="reingreso">Reingreso</option>
             <option value="otro">Otro</option>
+            <option value="tv_creado">TV registrado</option>
+            <option value="tv_editado">TV editado</option>
+            <option value="tv_eliminado">TV eliminado (oculto)</option>
+            <option value="tv_eliminado_fisico">TV eliminado (físico)</option>
+            <option value="tv_serial">Serial modificado</option>
+            <option value="tv_asignado">TV asignado</option>
+            <option value="acta_eliminada">Acta eliminada</option>
           </select>
         </div>
       </div>
@@ -909,7 +917,7 @@
     </div>
   </div>
 
-  <!-- MODAL: ELIMINAR TODOS LOS DATOS (Admin) -->
+  <!-- MODAL: ELIMINAR TODOS LOS DATOS (Admin) - Doble confirmación -->
   <div class="modal-overlay" id="modalDeleteAll">
     <div class="modal modal-sm">
       <div class="modal-header" style="background:rgba(255,77,109,0.1); border-bottom-color:rgba(255,77,109,0.3);">
@@ -918,7 +926,7 @@
       </div>
       <div class="modal-body">
         <div style="background:rgba(255,77,109,0.08); border:1px solid rgba(255,77,109,0.3); border-radius:8px; padding:14px; margin-bottom:1rem;">
-          <p style="font-weight:700; color:#ff4d6d; margin-bottom:6px;">⚠️ PELIGRO: Esta acción es irreversible</p>
+          <p style="font-weight:700; color:#ff4d6d; margin-bottom:6px;">⚠️ PRIMER PASO DE CONFIRMACIÓN</p>
           <p style="font-size:0.85rem; color:var(--text-secondary);">Se eliminarán TODOS los TVs, movimientos, configuración e imágenes de actas de la base de datos.</p>
         </div>
         <div class="form-group">
@@ -928,6 +936,28 @@
         <div class="form-actions" style="margin-top:1rem;">
           <button class="btn btn-secondary" onclick="closeModal('modalDeleteAll')">Cancelar</button>
           <button class="btn btn-danger" id="btnConfirmDeleteAll">💣 Eliminar Todo</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: SEGUNDA CONFIRMACIÓN ELIMINAR TODO (Admin) -->
+  <div class="modal-overlay" id="modalDeleteAllConfirm2">
+    <div class="modal modal-sm">
+      <div class="modal-header" style="background:rgba(255,77,109,0.2); border-bottom-color:rgba(255,77,109,0.5);">
+        <h3 style="color:#ff4d6d;">🛑 CONFIRMACIÓN FINAL</h3>
+        <button class="modal-close" onclick="closeModal('modalDeleteAllConfirm2')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="background:rgba(255,77,109,0.12); border:1px solid rgba(255,77,109,0.4); border-radius:8px; padding:14px; margin-bottom:1rem; text-align:center;">
+          <p style="font-size:2.2rem; margin-bottom:0.5rem;">💣</p>
+          <p style="font-weight:800; color:#ff4d6d; font-size:1.05rem; margin-bottom:6px;">SEGUNDA CONFIRMACIÓN</p>
+          <p style="font-size:0.9rem; color:var(--text-secondary);">¿Estás <strong>absolutamente seguro</strong> de que deseas eliminar <strong>TODOS</strong> los datos?</p>
+          <p style="font-size:0.85rem; color:var(--danger); margin-top:6px;">Esta acción es <strong>irreversible</strong>. No hay forma de recuperar la información.</p>
+        </div>
+        <div class="form-actions" style="margin-top:1rem; justify-content:center;">
+          <button class="btn btn-secondary" onclick="closeModal('modalDeleteAllConfirm2')">↩️ Volver</button>
+          <button class="btn btn-danger" id="btnConfirmDeleteAll2" style="font-weight:700;">💣 Sí, Eliminar TODO</button>
         </div>
       </div>
     </div>

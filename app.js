@@ -178,7 +178,15 @@ const tipoLabel = {
   retorno_taller: '✅ Retorno de taller',
   baja:           '❌ Dado de baja',
   reingreso:      '🔄 Reingreso al servicio',
-  otro:           '📝 Otro'
+  otro:           '📝 Otro',
+  tv_creado:      '➕ TV registrado',
+  tv_editado:     '✏️ TV editado',
+  tv_eliminado:   '🗑️ TV eliminado (oculto)',
+  tv_eliminado_fisico: '💀 TV eliminado (físico)',
+  tv_serial:      '🔑 Serial modificado',
+  tv_asignado:    '🏨 TV asignado',
+  acta_eliminada: '📄 Acta eliminada',
+  bd_reseteada:   '💣 Base de datos reiniciada'
 };
 
 const estadoBadge = {
@@ -657,6 +665,26 @@ function imprimirDetalleTV() {
   setTimeout(() => { printWin.print(); }, 500);
 }
 
+// ─── REGISTRO DE EVENTOS DE TV (para Historial Global) ─────
+async function registrarEventoTV({ tipo, tvId = null, codigo = '', detalle = '', responsable = '' }) {
+  try {
+    const ev = {
+      id: uid(),
+      tvId,
+      codigo: codigo || (tvId ? (loadAllTVs().find(t => String(t.id) === String(tvId))?.codigo || '') : ''),
+      tipo,
+      esEvento: true,
+      fecha: new Date().toISOString().slice(0, 10),
+      motivo: detalle,
+      responsable: responsable || (window.currentUser ? (window.currentUser.name || window.currentUser.email || 'Usuario') : '—'),
+      creadoEn: new Date().toISOString()
+    };
+    await db.collection('movimientos').doc(ev.id).set(ev);
+  } catch (e) {
+    console.error('Error registrando evento:', e);
+  }
+}
+
 // ─── ELIMINAR TV (ELIMINACIÓN LÓGICA) ─────────────────────
 let _pendingDeleteId = null;
 
@@ -674,6 +702,17 @@ document.getElementById('btnConfirmDelete').addEventListener('click', async () =
   btn.disabled = true;
 
   try {
+    // Registrar evento en el historial global
+    const tvElim = loadAllTVs().find(t => String(t.id) === String(_pendingDeleteId));
+    if (tvElim) {
+      await registrarEventoTV({
+        tipo: 'tv_eliminado',
+        tvId: tvElim.id,
+        codigo: tvElim.codigo,
+        detalle: `TV ${tvElim.codigo} (${tvElim.marca || ''} ${tvElim.modelo || ''}) ocultado del inventario`
+      });
+    }
+
     // Eliminación lógica: marcar como eliminado
     await db.collection('tvs').doc(_pendingDeleteId).update({
       deleted: true,
@@ -681,8 +720,8 @@ document.getElementById('btnConfirmDelete').addEventListener('click', async () =
       deletedBy: window.currentUser ? window.currentUser.uid : 'unknown'
     });
     
-    // También marcar movimientos como eliminados lógicamente
-    const movsToDelete = loadMovs().filter(m => String(m.tvId) === String(_pendingDeleteId) && !m.deleted);
+    // También marcar movimientos como eliminados lógicamente (excepto eventos del historial)
+    const movsToDelete = loadMovs().filter(m => String(m.tvId) === String(_pendingDeleteId) && !m.deleted && !m.esEvento);
     if (movsToDelete.length > 0) {
       const batch = db.batch();
       movsToDelete.forEach(m => {
@@ -727,11 +766,22 @@ document.getElementById('btnConfirmPhysicalDelete').addEventListener('click', as
   btn.disabled = true;
 
   try {
+    // Registrar evento ANTES de eliminar el TV (para que quede constancia en el historial)
+    const tvElimFis = loadAllTVs().find(t => String(t.id) === String(_pendingPhysicalDeleteId));
+    if (tvElimFis) {
+      await registrarEventoTV({
+        tipo: 'tv_eliminado_fisico',
+        tvId: tvElimFis.id,
+        codigo: tvElimFis.codigo,
+        detalle: `TV ${tvElimFis.codigo} (${tvElimFis.marca || ''} ${tvElimFis.modelo || ''}) eliminado permanentemente`
+      });
+    }
+
     // Eliminar físicamente el TV
     await db.collection('tvs').doc(_pendingPhysicalDeleteId).delete();
     
-    // Eliminar físicamente sus movimientos
-    const movsToDelete = loadMovs().filter(m => String(m.tvId) === String(_pendingPhysicalDeleteId));
+    // Eliminar físicamente sus movimientos (excepto los eventos del historial)
+    const movsToDelete = loadMovs().filter(m => String(m.tvId) === String(_pendingPhysicalDeleteId) && !m.esEvento);
     if (movsToDelete.length > 0) {
       const batch = db.batch();
       movsToDelete.forEach(m => {
@@ -805,7 +855,13 @@ function confirmarEliminacionFisicaMovimiento(movId) {
   if (!mov) return;
   if (!confirm(`⚠️ ELIMINACIÓN FÍSICA\n\n¿Eliminar permanentemente este movimiento?\n\nTipo: ${mov.tipo}\nFecha: ${mov.fecha}\nResponsable: ${mov.responsable}\n\nEsta acción no se puede deshacer.`)) return;
   db.collection('movimientos').doc(movId).delete()
-    .then(() => {
+    .then(async () => {
+      await registrarEventoTV({
+        tipo: 'otro',
+        tvId: mov.tvId,
+        codigo: mov.codigo,
+        detalle: `Movimiento (${tipoLabel[mov.tipo] || mov.tipo}) eliminado permanentemente del historial`
+      });
       showToast('Movimiento eliminado permanentemente.', 'success');
       window.appData.movimientos = window.appData.movimientos.filter(m => String(m.id) !== String(movId));
       renderHistorial();
@@ -823,7 +879,13 @@ function confirmarEliminarActaMovimiento(movId) {
   if (!mov || !mov.actaUrl) return;
   if (!confirm('¿Eliminar el acta de este movimiento?\n\nEsta acción no se puede deshacer.')) return;
   db.collection('movimientos').doc(movId).update({ actaUrl: firebase.firestore.FieldValue.delete() })
-    .then(() => {
+    .then(async () => {
+      await registrarEventoTV({
+        tipo: 'acta_eliminada',
+        tvId: mov.tvId,
+        codigo: mov.codigo,
+        detalle: `Acta del movimiento (${tipoLabel[mov.tipo] || mov.tipo}) eliminada`
+      });
       showToast('Acta eliminada correctamente.', 'success');
       mov.actaUrl = null;
       renderHistorial();
@@ -853,7 +915,17 @@ function setupChangeSerialListener() {
     btn.textContent = 'Cambiando...';
     btn.disabled = true;
     try {
+      const tvSerialAntes = loadAllTVs().find(t => String(t.id) === String(_pendingChangeSerialId));
       await db.collection('tvs').doc(_pendingChangeSerialId).update({ serial: newSerial });
+      // Registrar evento
+      if (tvSerialAntes) {
+        await registrarEventoTV({
+          tipo: 'tv_serial',
+          tvId: tvSerialAntes.id,
+          codigo: tvSerialAntes.codigo,
+          detalle: `Serial del TV ${tvSerialAntes.codigo} cambiado de "${tvSerialAntes.serial}" a "${newSerial}"`
+        });
+      }
       _pendingChangeSerialId = null;
       closeModal('modalChangeSerial');
       showToast('Serial actualizado correctamente.', 'success');
@@ -873,18 +945,27 @@ function confirmarEliminarTodo() {
   openModal('modalDeleteAll');
 }
 
+// Flujo de doble confirmación para eliminar todos los datos
 function setupDeleteAllListener() {
   const btn = document.getElementById('btnConfirmDeleteAll');
   if (!btn) return;
-  btn.addEventListener('click', async () => {
+  btn.addEventListener('click', () => {
     const confirmText = document.getElementById('deleteAllConfirmText').value.trim();
     if (confirmText !== 'ELIMINAR') {
       showToast('Debe escribir "ELIMINAR" para confirmar.', 'error');
       return;
     }
-    const prevText = btn.textContent;
-    btn.textContent = 'Eliminando todo...';
-    btn.disabled = true;
+    // Primera confirmación válida → pasar a la segunda
+    closeModal('modalDeleteAll');
+    openModal('modalDeleteAllConfirm2');
+  });
+
+  const btn2 = document.getElementById('btnConfirmDeleteAll2');
+  if (!btn2) return;
+  btn2.addEventListener('click', async () => {
+    const prevText = btn2.textContent;
+    btn2.textContent = 'Eliminando todo...';
+    btn2.disabled = true;
     try {
       // Borrar tvs
       const tvsSnap = await db.collection('tvs').get();
@@ -902,14 +983,20 @@ function setupDeleteAllListener() {
         for (const item of listResult.items) { await item.delete(); }
       } catch (e) { /* sin imágenes */ }
 
-      closeModal('modalDeleteAll');
+      // Registrar evento de reinicio (para dejar constancia en el historial)
+      await registrarEventoTV({
+        tipo: 'bd_reseteada',
+        detalle: `Base de datos reiniciada por ${window.currentUser ? (window.currentUser.name || window.currentUser.email) : 'admin'}`
+      });
+
+      closeModal('modalDeleteAllConfirm2');
       showToast('Todos los datos han sido eliminados.', 'success');
     } catch (e) {
       console.error(e);
       showToast('Error al eliminar: ' + e.message, 'error');
     } finally {
-      btn.textContent = prevText;
-      btn.disabled = false;
+      btn2.textContent = prevText;
+      btn2.disabled = false;
     }
   });
 }
@@ -969,17 +1056,26 @@ function setupEliminarGrupoListener() {
         showToast('No hay registros en este grupo.', 'info');
         return;
       }
-      // Eliminar físicamente cada TV y sus movimientos
+      // Registrar evento para cada TV eliminado
+      for (const tv of tvsAEliminar) {
+        await registrarEventoTV({
+          tipo: 'tv_eliminado_fisico',
+          tvId: tv.id,
+          codigo: tv.codigo,
+          detalle: `TV ${tv.codigo} eliminado permanentemente (eliminación por grupo: ${tipo === 'todos' ? 'todos' : tipo})`
+        });
+      }
+      // Eliminar físicamente cada TV
       for (const id of ids) {
         await db.collection('tvs').doc(id).delete();
       }
-      // Eliminar movimientos asociados a esos TVs
+      // Eliminar movimientos asociados a esos TVs (excepto eventos del historial)
       const movsSnap = await db.collection('movimientos').get();
       const batch = db.batch();
       let ops = 0;
       movsSnap.docs.forEach(doc => {
         const m = doc.data();
-        if (ids.includes(String(m.tvId))) {
+        if (!m.esEvento && ids.includes(String(m.tvId))) {
           batch.delete(doc.ref);
           ops++;
         }
@@ -1500,6 +1596,14 @@ document.getElementById('formTV').addEventListener('submit', e => {
   try {
     // La imagen ya está comprimida en currentImgTrasera como base64
     await db.collection('tvs').doc(tv.id).set(tv);
+
+    // Registrar evento en el historial global
+    await registrarEventoTV({
+      tipo: existId ? 'tv_editado' : 'tv_creado',
+      tvId: tv.id,
+      codigo: tv.codigo,
+      detalle: `${existId ? 'TV actualizado' : 'Nuevo TV registrado'}: ${tv.codigo} (${tv.marca || ''} ${tv.modelo || ''})`
+    });
 
     if (existId) {
       showToast('TV actualizado correctamente.', 'success');
@@ -2475,7 +2579,7 @@ function renderHistorial(filtroTipo = '', busqueda = '') {
     const q = busqueda.toLowerCase();
     movs = movs.filter(m => {
       const tv = tvs.find(t => String(t.id) === String(m.tvId));
-      return [m.motivo, m.responsable, m.habDestino, tv?.codigo, tv?.habitacion]
+      return [m.motivo, m.responsable, m.habDestino, tv?.codigo, tv?.habitacion, m.codigo]
         .some(v => v && v.toLowerCase().includes(q));
     });
   }
@@ -2485,15 +2589,17 @@ function renderHistorial(filtroTipo = '', busqueda = '') {
   }
   tbody.innerHTML = movs.map(m => {
     const tv = tvs.find(t => String(t.id) === String(m.tvId));
-    const hasActa = tv && (m.actaUrl || m.tipo);
+    const esEvento = m.esEvento === true;
+    const codigoMostrar = esEvento ? (m.codigo || '—') : (tv?.codigo || '—');
+    const hasActa = !esEvento && tv && (m.actaUrl || m.tipo);
     const actaBtn = hasActa ? `<span class="ml-acta-icon" title="Ver acta" style="cursor:pointer; font-size:0.85rem; opacity:0.7; margin-left:4px;" onclick="event.stopPropagation(); openActaFromMov(event, '${m.id}')">📄</span>` : '';
-    const logDelBtn = hasPermission('eliminar_movimiento') && !m.deleted ? `<button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); confirmarEliminarMovimiento('${m.id}')" title="Ocultar registro" style="font-size:0.7rem; padding:2px 6px;">🗑️</button>` : '';
-    const physDelBtn = hasPermission('eliminar_fisico_movimiento') && m.deleted ? `<button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); confirmarEliminacionFisicaMovimiento('${m.id}')" title="Eliminar permanentemente" style="font-size:0.7rem; padding:2px 6px; background:rgba(255,77,109,0.2); border-color:rgba(255,77,109,0.5);">💀</button>` : '';
-    const actaDelBtn = hasPermission('eliminar_fisico_acta') && m.actaUrl ? `<button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); confirmarEliminarActaMovimiento('${m.id}')" title="Eliminar acta" style="font-size:0.7rem; padding:2px 6px; background:rgba(255,165,0,0.15); border-color:rgba(255,165,0,0.4); color:#ff9500;">📄✕</button>` : '';
+    const logDelBtn = !esEvento && hasPermission('eliminar_movimiento') && !m.deleted ? `<button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); confirmarEliminarMovimiento('${m.id}')" title="Ocultar registro" style="font-size:0.7rem; padding:2px 6px;">🗑️</button>` : '';
+    const physDelBtn = !esEvento && hasPermission('eliminar_fisico_movimiento') && m.deleted ? `<button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); confirmarEliminacionFisicaMovimiento('${m.id}')" title="Eliminar permanentemente" style="font-size:0.7rem; padding:2px 6px; background:rgba(255,77,109,0.2); border-color:rgba(255,77,109,0.5);">💀</button>` : '';
+    const actaDelBtn = !esEvento && hasPermission('eliminar_fisico_acta') && m.actaUrl ? `<button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); confirmarEliminarActaMovimiento('${m.id}')" title="Eliminar acta" style="font-size:0.7rem; padding:2px 6px; background:rgba(255,165,0,0.15); border-color:rgba(255,165,0,0.4); color:#ff9500;">📄✕</button>` : '';
     const actionsHtml = logDelBtn || physDelBtn || actaDelBtn ? `<div class="actions-cell" style="gap:4px;">${logDelBtn}${physDelBtn}${actaDelBtn}</div>` : '—';
-    return `<tr tabindex="0" data-tvid="${m.tvId || ''}" data-movid="${m.id || ''}">
+    return `<tr tabindex="0" data-tvid="${m.tvId || ''}" data-movid="${m.id || ''}" style="${esEvento ? 'background:rgba(99,179,237,0.05);' : ''}">
       <td style="font-size:0.78rem;white-space:nowrap">${fmtDate(m.fecha)}</td>
-      <td><strong style="color:var(--accent)">${tv?.codigo || '—'}</strong>${actaBtn}</td>
+      <td><strong style="color:var(--accent)">${codigoMostrar}</strong>${esEvento ? '<span style="margin-left:4px; font-size:0.65rem; background:rgba(99,179,237,0.2); color:var(--accent); border:1px solid rgba(99,179,237,0.3); border-radius:4px; padding:1px 5px;">EVENTO</span>' : ''}${actaBtn}</td>
       <td>${tv?.habitacion || '—'}</td>
       <td>${tipoLabel[m.tipo] || m.tipo}</td>
       <td>${m.habDestino ? 'Hab. ' + m.habDestino : '—'}</td>
