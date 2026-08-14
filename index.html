@@ -9,21 +9,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.default.css" rel="stylesheet" />
-  <!-- Redirección inmediata si no hay sesión -->
-  <script>
-    (function() {
-      // Si ya hay sesión de Firebase, no redirigir
-      try {
-        var user = firebase && firebase.auth && firebase.auth().currentUser;
-        if (user) return;
-      } catch(e) {}
-      // Verificar si hay sesión en localStorage de Firebase
-      var storageKey = Object.keys(localStorage).find(k => k.startsWith('firebase:authUser:'));
-      if (!storageKey) {
-        window.location.replace('users.html');
-      }
-    })();
-  </script>
   <link rel="stylesheet" href="style.css" />
   
   <!-- Firebase Compat Scripts -->

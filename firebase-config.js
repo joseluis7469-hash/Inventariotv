@@ -33,7 +33,7 @@ auth.onAuthStateChanged(async (user) => {
         email: user.email,
         role: 'consulta',
         status: 'active',
-        permissions: ['dashboard', 'inventario', 'movimientos', 'historial', 'nuevo_tv', 'editar_tv', 'asignar_tv'],
+        permissions: ROLE_ALL_PERMISSIONS['consulta'],
         createdAt: new Date().toISOString(),
         lastLogin: new Date().toISOString()
       };
@@ -43,11 +43,8 @@ auth.onAuthStateChanged(async (user) => {
     if (doc.exists && doc.data().status === 'active') {
       window.currentUser = { uid: user.uid, ...doc.data() };
       window.userPermissions = doc.data().permissions || [];
-      // Sincronizar permisos según rol
-      syncUserPermissions(user.uid);
     } else if (doc.exists && doc.data().status === 'inactive') {
       window.currentUser = null;
-      // No redirigir para evitar bucle - mostrar mensaje de error
       const loader = document.getElementById('app-loader');
       if (loader) {
         loader.innerHTML = '<div style="text-align:center; color: #ff6b6b;"><h2 style="margin-bottom: 1rem;">⚠️ Cuenta Desactivada</h2><p>Tu cuenta ha sido desactivada. Contacta al administrador.</p><br><button onclick="firebase.auth().signOut(); window.location.href=\'users.html\';" style="padding:10px 20px; background:#ff4d6d; color:#fff; border:none; border-radius:8px; cursor:pointer; font-weight:600;">Cerrar Sesión</button></div>';
@@ -66,6 +63,8 @@ auth.onAuthStateChanged(async (user) => {
     window._authReady = true;
     updateSidebarUser();
     checkAppReady();
+    // Sincronizar permisos después de cargar la app (sin recargar)
+    syncUserPermissions(user.uid);
   }
 });
 
@@ -82,7 +81,7 @@ function updateSidebarUser() {
   if (avatar) avatar.textContent = initials;
   if (nameEl) nameEl.textContent = u.name || u.email;
   if (roleEl) {
-    const roleNames = { admin: '🛡️ Administrador', jefe_area: '🔧 Jefe de Área', tecnico: '🧑‍🔧 Técnico', recepcion: '🖥️ Recepción', consulta: '👁️ Consulta' };
+    const roleNames = { admin: '🛡️ Administrador',       jefe_area: '🔧 Coordinador de Área', tecnico: '🧑‍🔧 Técnico', recepcion: '🖥️ Recepción', consulta: '👁️ Consulta' };
     roleEl.textContent = roleNames[u.role] || u.role;
   }
   // Topbar
