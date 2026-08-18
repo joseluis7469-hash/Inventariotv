@@ -367,6 +367,9 @@ function renderDashboard() {
   document.getElementById('stat-taller').textContent  = tvs.filter(t => t.estado === 'taller').length;
   document.getElementById('stat-baja').textContent    = tvs.filter(t => t.estado === 'baja').length;
 
+  const sinTV = getHabitacionesSinTV();
+  document.getElementById('stat-sintv').textContent = sinTV.length;
+
   // Últimos movimientos
   const elMov = document.getElementById('dash-movimientos');
   const recientes = [...movs].sort((a, b) => {
@@ -1334,6 +1337,64 @@ function isValidRoom(room) {
     ...getRoomsForArea('Anillo 3')
   ];
   return validRooms.includes(room);
+}
+
+// Habitaciones del hotel agrupadas por área
+function getTodasLasHabitaciones() {
+  return {
+    'Premium 68': getRoomsForArea('Premium 68'),
+    'Premium 69': getRoomsForArea('Premium 69'),
+    'Anillo 1':   getRoomsForArea('Anillo 1'),
+    'Anillo 2':   getRoomsForArea('Anillo 2'),
+    'Anillo 3':   getRoomsForArea('Anillo 3')
+  };
+}
+
+// Devuelve las habitaciones que NO tienen un TV asignado (ubicacion 'Habitacion')
+function getHabitacionesSinTV() {
+  const tvs = loadTVs();
+  const asignadas = new Set();
+  tvs.forEach(t => {
+    if ((t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') && t.habitacion) {
+      asignadas.add(String(t.habitacion).trim());
+    }
+  });
+  const todas = [];
+  Object.values(getTodasLasHabitaciones()).forEach(list => list.forEach(r => todas.push(r)));
+  return todas.filter(r => !asignadas.has(r));
+}
+
+// Abre el modal con el listado de habitaciones sin TV agrupado por área
+function abrirModalSinTV() {
+  const asignadas = new Set();
+  loadTVs().forEach(t => {
+    if ((t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') && t.habitacion) {
+      asignadas.add(String(t.habitacion).trim());
+    }
+  });
+  const areas = getTodasLasHabitaciones();
+  const body = document.getElementById('modalSinTVBody');
+  let totalSin = 0;
+  let html = '';
+  Object.entries(areas).forEach(([area, rooms]) => {
+    const sin = rooms.filter(r => !asignadas.has(r));
+    totalSin += sin.length;
+    const cards = sin.length
+      ? sin.map(r => `<span style="display:inline-block; padding:6px 12px; margin:4px; border:1px solid rgba(179,110,255,0.35); background:rgba(179,110,255,0.1); border-radius:8px; font-size:0.85rem; font-weight:600; color:var(--text-primary);">${r}</span>`).join('')
+      : '<span style="color:var(--text-secondary); font-size:0.85rem;">Todas las habitaciones tienen TV ✅</span>';
+    html += `
+      <div style="margin-bottom:1rem;">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+          <strong style="font-size:0.9rem;">🏨 ${area}</strong>
+          <span style="font-size:0.7rem; padding:2px 8px; border-radius:10px; background:rgba(255,77,109,0.15); color:#ff4d6d; border:1px solid rgba(255,77,109,0.3);">${sin.length} sin TV</span>
+          <span style="font-size:0.7rem; color:var(--text-secondary);">/ ${rooms.length} habs.</span>
+        </div>
+        <div style="line-height:1;">${cards}</div>
+      </div>`;
+  });
+  html = `<div style="margin-bottom:1rem; padding:10px 14px; border-radius:8px; background:rgba(179,110,255,0.1); border:1px solid rgba(179,110,255,0.3); font-size:0.85rem;"><strong style="color:#b36eff;">${totalSin}</strong> habitaciones de ${Object.values(areas).reduce((a, l) => a + l.length, 0)} no tienen TV asignado.</div>` + html;
+  body.innerHTML = html;
+  openModal('modalSinTV');
 }
 
 function toggleAsignarHabNumero(area) {

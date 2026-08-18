@@ -116,6 +116,13 @@
             <span class="stat-label">Dados de Baja</span>
           </div>
         </div>
+        <div class="stat-card stat-sintv" tabindex="0" role="button" onclick="abrirModalSinTV()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); abrirModalSinTV();}" title="Ver habitaciones sin TV asignado">
+          <div class="stat-icon">🛏️</div>
+          <div class="stat-info">
+            <span class="stat-num" id="stat-sintv">0</span>
+            <span class="stat-label">Habitaciones sin TV</span>
+          </div>
+        </div>
       </div>
 
       <div class="dashboard-grid">
@@ -685,6 +692,17 @@
         <button class="modal-close" onclick="closeModal('modalDetalle')">✕</button>
       </div>
       <div class="modal-body" id="modalDetalleBody"></div>
+    </div>
+  </div>
+
+  <!-- MODAL: HABITACIONES SIN TV -->
+  <div class="modal-overlay" id="modalSinTV">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>🛏️ Habitaciones sin TV asignado</h3>
+        <button class="modal-close" onclick="closeModal('modalSinTV')">✕</button>
+      </div>
+      <div class="modal-body" id="modalSinTVBody"></div>
     </div>
   </div>
 

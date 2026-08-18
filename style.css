@@ -347,6 +347,8 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 .stat-taller::before { background: linear-gradient(135deg, rgba(255,204,0,0.2), transparent); }
 .stat-baja   { border-top: 3px solid #ff4d6d; box-shadow: 0 0 18px rgba(255,77,109,0.15); }
 .stat-baja::before { background: linear-gradient(135deg, rgba(255,77,109,0.2), transparent); }
+.stat-sintv  { border-top: 3px solid #b36eff; box-shadow: 0 0 18px rgba(179,110,255,0.15); cursor: pointer; }
+.stat-sintv::before { background: linear-gradient(135deg, rgba(179,110,255,0.2), transparent); }
 
 .stat-icon { font-size: 2rem; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.4)); }
 .stat-info { display: flex; flex-direction: column; }
