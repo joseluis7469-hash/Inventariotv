@@ -522,7 +522,10 @@ function renderInventario(filtroEstado = '', filtroUbicacion = '', busqueda = ''
     });
   });
   // Auto-select and focus first row for immediate keyboard navigation
-  if (rows.length) selectRow(rows[0]);
+  // (no robar el foco si el usuario está escribiendo en un campo de búsqueda/filtro)
+  const activeEl = document.activeElement;
+  const escribiendo = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'SELECT' || activeEl.tagName === 'TEXTAREA');
+  if (rows.length && !escribiendo) selectRow(rows[0]);
 }
 
 // Filtros de inventario
