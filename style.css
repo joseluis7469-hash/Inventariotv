@@ -1280,8 +1280,6 @@ textarea { resize: vertical; min-height: 80px; }
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.7);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
   z-index: 200;
   display: none;
   align-items: center;
@@ -1293,8 +1291,6 @@ textarea { resize: vertical; min-height: 80px; }
 
 .modal {
   background: rgba(5, 15, 45, 0.92);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(0,212,255,0.25);
   border-radius: var(--radius);
   box-shadow: 0 8px 40px rgba(0,0,0,0.6), 0 0 30px rgba(0,212,255,0.1);

@@ -674,16 +674,18 @@ function imprimirDetalleTV() {
 // ─── REGISTRO DE EVENTOS DE TV (para Historial Global) ─────
 async function registrarEventoTV({ tipo, tvId = null, codigo = '', detalle = '', responsable = '' }) {
   try {
+    const ahora = new Date();
+    const fechaLocal = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}-${String(ahora.getDate()).padStart(2, '0')}`;
     const ev = {
       id: uid(),
       tvId,
       codigo: codigo || (tvId ? (loadAllTVs().find(t => String(t.id) === String(tvId))?.codigo || '') : ''),
       tipo,
       esEvento: true,
-      fecha: new Date().toISOString().slice(0, 10),
+      fecha: fechaLocal,
       motivo: detalle,
       responsable: responsable || (window.currentUser ? (window.currentUser.name || window.currentUser.email || 'Usuario') : '—'),
-      creadoEn: new Date().toISOString()
+      creadoEn: ahora.toISOString()
     };
     await db.collection('movimientos').doc(ev.id).set(ev);
   } catch (e) {
@@ -1762,7 +1764,7 @@ function populateMovTV() {
     destInput.value = '';
   }
 
-  // Datetime local = ahora
+  // Datetime local = ahora (hora local del CPU, no UTC)
   const now = new Date();
   now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
   document.getElementById('movFecha').value = now.toISOString().slice(0,16);
