@@ -1399,6 +1399,51 @@ function abrirModalSinTV() {
   openModal('modalSinTV');
 }
 
+// Abre el modal con el listado de TVs que están en el Taller
+function abrirModalTaller() {
+  const tvs = loadTVs().filter(t => t.estado === 'taller' || String(t.ubicacion || '').toLowerCase() === 'taller');
+  const body = document.getElementById('modalTallerBody');
+  const operativos = tvs.filter(t => t.estado === 'operativo' || t.estado === 'activo');
+  const inoperativos = tvs.filter(t => t.estado === 'inoperativo' || t.estado === 'taller' || t.estado === 'baja');
+
+  let html = '';
+  if (!tvs.length) {
+    html = '<p class="empty-state">No hay TVs en el Taller actualmente.</p>';
+  } else {
+    html = `<div style="margin-bottom:1rem; padding:10px 14px; border-radius:8px; background:rgba(255,204,0,0.1); border:1px solid rgba(255,204,0,0.3); font-size:0.85rem;">
+      <strong style="color:#ffcc00;">${tvs.length}</strong> TVs en el Taller ·
+      <span style="color:#00f5a0;">✅ ${operativos.length} operativos</span> ·
+      <span style="color:#ff4d6d;">❌ ${inoperativos.length} inoperativos</span>
+    </div>`;
+    html += `<div class="table-wrapper" style="max-height:55vh; overflow-y:auto;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Código</th>
+            <th>Marca</th>
+            <th>Modelo</th>
+            <th>Serial</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tvs.map(t => `
+            <tr tabindex="0" ondblclick="verDetalle('${t.id}')" title="Doble clic para ver detalle">
+              <td><strong style="color:var(--accent)">${t.codigo}</strong></td>
+              <td>${t.marca}</td>
+              <td>${t.modelo || '—'}</td>
+              <td style="font-size:0.78rem;color:var(--text-secondary)">${t.serial}</td>
+              <td>${estadoBadge[t.estado] || t.estado}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  }
+  body.innerHTML = html;
+  openModal('modalTaller');
+}
+
 function toggleAsignarHabNumero(area) {
   const grp = document.getElementById('grpAsignarHabNumero');
   const selHab = document.getElementById('asignarHabNumero');

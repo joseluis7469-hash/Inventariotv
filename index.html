@@ -102,7 +102,7 @@
             <span class="stat-label">En Habitación</span>
           </div>
         </div>
-        <div class="stat-card stat-taller">
+        <div class="stat-card stat-taller" tabindex="0" role="button" onclick="abrirModalTaller()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); abrirModalTaller();}" title="Ver TVs en taller">
           <div class="stat-icon">🔧</div>
           <div class="stat-info">
             <span class="stat-num" id="stat-taller">0</span>
@@ -704,6 +704,17 @@
         <button class="modal-close" onclick="closeModal('modalSinTV')">✕</button>
       </div>
       <div class="modal-body" id="modalSinTVBody"></div>
+    </div>
+  </div>
+
+  <!-- MODAL: TVS EN TALLER -->
+  <div class="modal-overlay" id="modalTaller">
+    <div class="modal">
+      <div class="modal-header" style="background:rgba(255,204,0,0.1); border-bottom-color:rgba(255,204,0,0.3);">
+        <h3 style="text-shadow:0 0 12px rgba(255,204,0,0.4);">🔧 TVs en Taller</h3>
+        <button class="modal-close" onclick="closeModal('modalTaller')">✕</button>
+      </div>
+      <div class="modal-body" id="modalTallerBody"></div>
     </div>
   </div>
 

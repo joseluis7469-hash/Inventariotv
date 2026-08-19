@@ -343,7 +343,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 .stat-total::before { background: linear-gradient(135deg, rgba(0,212,255,0.2), transparent); }
 .stat-activo { border-top: 3px solid #00f5a0; box-shadow: 0 0 18px rgba(0,245,160,0.15); }
 .stat-activo::before { background: linear-gradient(135deg, rgba(0,245,160,0.2), transparent); }
-.stat-taller { border-top: 3px solid #ffcc00; box-shadow: 0 0 18px rgba(255,204,0,0.15); }
+.stat-taller { border-top: 3px solid #ffcc00; box-shadow: 0 0 18px rgba(255,204,0,0.15); cursor: pointer; }
 .stat-taller::before { background: linear-gradient(135deg, rgba(255,204,0,0.2), transparent); }
 .stat-baja   { border-top: 3px solid #ff4d6d; box-shadow: 0 0 18px rgba(255,77,109,0.15); }
 .stat-baja::before { background: linear-gradient(135deg, rgba(255,77,109,0.2), transparent); }
