@@ -793,7 +793,11 @@ document.getElementById('btnConfirmPhysicalDelete').addEventListener('click', as
     await db.collection('tvs').doc(_pendingPhysicalDeleteId).delete();
     
     // Eliminar físicamente sus movimientos (excepto los eventos del historial)
-    const movsToDelete = loadAllMovs().filter(m => String(m.tvId) === String(_pendingPhysicalDeleteId) && !m.esEvento);
+    const movsToDelete = loadAllMovs().filter(m =>
+      !m.esEvento &&
+      (String(m.tvId) === String(_pendingPhysicalDeleteId) ||
+       (m.tvReemplazo && String(m.tvReemplazo.id) === String(_pendingPhysicalDeleteId)))
+    );
     // Eliminar las imágenes de actas de esos movimientos en Storage
     await eliminarActasDeMovimientos(movsToDelete);
     if (movsToDelete.length > 0) {
@@ -1190,7 +1194,7 @@ function setupEliminarGrupoListener() {
       const movsToDelete = [];
       movsSnap.docs.forEach(doc => {
         const m = doc.data();
-        if (!m.esEvento && ids.includes(String(m.tvId))) {
+        if (!m.esEvento && (ids.includes(String(m.tvId)) || (m.tvReemplazo && ids.includes(String(m.tvReemplazo.id))))) {
           batch.delete(doc.ref);
           movsToDelete.push(m);
           ops++;
@@ -1851,6 +1855,27 @@ document.getElementById('formTV').addEventListener('submit', e => {
       detalle: `${existId ? 'TV actualizado' : 'Nuevo TV registrado'}: ${tv.codigo} (${tv.marca || ''} ${tv.modelo || ''})`
     });
 
+    // Si el TV nuevo se registra directamente en el Taller, generar movimiento de envío a taller y su acta
+    if (!existId && String(ubicacionVal || '').toLowerCase() === 'taller') {
+      const mov = {
+        id: uid(),
+        tvId: tv.id,
+        tipo: 'entrada_taller',
+        fecha: get('tvFechaIngreso') || 'desconocida',
+        responsable: window.currentUser ? (window.currentUser.name || window.currentUser.email || 'Usuario') : 'Usuario',
+        motivo: 'Registro inicial del TV en el Taller de Reparaciones',
+        origen: 'Registro de nuevo activo',
+        destino: 'Taller',
+        habDestino: '',
+        tvReemplazo: null,
+        tvSaliente: '',
+        creadoEn: new Date().toISOString()
+      };
+      await db.collection('movimientos').doc(mov.id).set(mov);
+      const tvRegistrado = loadTVs().find(t => String(t.id) === String(tv.id));
+      setTimeout(() => imprimirActaFromData(mov, tvRegistrado || tv), 1200);
+    }
+
     if (existId) {
       showToast('TV actualizado correctamente.', 'success');
       resetFormTV();
@@ -2310,6 +2335,45 @@ if (elMovMotivo) {
 }
 
 
+// Devuelve el texto del procedimiento específico según el tipo de movimiento
+function textoProcedimientoActivo(mov, tv) {
+  const t = (mov.tipo || 'otro');
+  const codigo = tv.codigo || '___';
+  const marca = tv.marca || '___';
+  const modelo = tv.modelo || '___';
+  const tamano = tv.tamano || '___';
+  const serial = tv.serial || '___';
+  const origen = mov.origen || '______________';
+  const destino = mov.destino || '______________';
+
+  const base = `Se procede a registrar el movimiento del TV código interno <strong>${codigo}</strong>, marca <strong>${marca}</strong>, modelo <strong>${modelo}</strong>, de <strong>${tamano}</strong>, y serial <strong>${serial}</strong>.`;
+
+  switch (t) {
+    case 'entrada_taller':
+      return `${base}<br>
+      <strong>Procedimiento de Envío a Taller:</strong> El televisor fue retirado de su ubicación de origen (${origen}) y trasladado al Taller de Reparaciones del HPA para su revisión técnica. Queda bajo custodia del personal técnico, registrado en la condición indicada (operativo/inoperativo), hasta su diagnóstico y reparación.`;
+    case 'retorno_taller':
+      return `${base}<br>
+      <strong>Procedimiento de Retorno de Taller:</strong> El televisor fue recibido del Taller de Reparaciones del HPA una vez concluida su revisión técnica, verificando su correcto funcionamiento. Se procede a reintegrarlo al inventario activo en la ubicación de destino (${destino}), quedando nuevamente disponible para su asignación.`;
+    case 'baja':
+      return `${base}<br>
+      <strong>Procedimiento de Baja de Activo:</strong> Se procede a dar de baja el televisor del inventario activo del HPA, quedando excluido del parque tecnológico. Se registran las razones de la baja y se deja constancia del retiro del equipo del servicio.`;
+    case 'reingreso':
+      return `${base}<br>
+      <strong>Procedimiento de Reingreso de Activo:</strong> El televisor, previamente dado de baja, es reintegrado al inventario activo del HPA tras verificarse las condiciones que motivan su reingreso. Queda registrado nuevamente como activo disponible.`;
+    case 'traslado_hab':
+      return `${base}<br>
+      <strong>Procedimiento de Traslado de Activo:</strong> Se retira el televisor de su ubicación de origen (${origen}) y se traslada a la habitación ${destino}. El equipo es instalado y verificado en la habitación designada, quedando en servicio.${mov.tvReemplazo ? `<br>
+      <strong>TV Reemplazado:</strong> El televisor existente en la habitación fue retirado y reubicado a: <strong>${mov.tvReemplazo.destino}</strong>.` : ''}`;
+    case 'otro':
+      return `${base}<br>
+      <strong>Procedimiento:</strong> Se procede al movimiento del activo desde ${origen} hacia ${destino}, conforme a las indicaciones de la Gerencia General.`;
+    default:
+      return `${base}<br>
+      <strong>Procedimiento:</strong> Se procede al movimiento del activo desde ${origen} hacia ${destino}.`;
+  }
+}
+
 function imprimirActaActual() {
   const get = id => (document.getElementById(id) ? document.getElementById(id).value.trim() : '');
   const tvId = get('movTV');
@@ -2392,9 +2456,7 @@ function imprimirActaActual() {
     En esta misma fecha, siendo las <u>&nbsp;${horaFmt}&nbsp;</u>, por instrucciones de la Gerencia General, se procede a realizar el siguiente movimiento de activo en el HPA.
     <br><br>
     <strong>Descripción del procedimiento:</strong><br>
-      Se procede a registrar el movimiento del TV código interno <strong>${tv.codigo}</strong>, marca <strong>${tv.marca}</strong>, modelo <strong>${tv.modelo || '___'}</strong>, de <strong>${tv.tamano || '___'}</strong>, y serial <strong>${tv.serial}</strong>.<br>
-    <strong>Ubicación de Origen:</strong> ${origen} &rarr; <strong>Ubicación de Destino:</strong> ${destino}.<br>
-    ${mov.tipo === 'traslado_hab' && mov.tvSaliente ? `<strong>Destino del TV saliente:</strong> ${mov.tvSaliente}.<br>` : ''}
+      ${textoProcedimientoActivo({ tipo: selTipo, origen, destino, tvSaliente: get('movTvSaliente') === 'otro' ? get('movTvSalienteOtro') : get('movTvSaliente'), tvReemplazo: window._tvReemplazo || null }, tv)}<br>
     <strong>Motivo del movimiento:</strong> ${motivo}<br>
     <strong>Responsable de la ejecución:</strong> ${respList.length ? respList.join(', ') : '______________________'}
   </div>
@@ -2474,14 +2536,12 @@ function imprimirActaFromData(mov, tv) {
       En esta misma fecha, siendo las <u>&nbsp;${horaFmt}&nbsp;</u>, por instrucciones de la Gerencia General, se procede a realizar el siguiente movimiento de activo en el HPA.
       <br><br>
       <strong>Descripción del procedimiento:</strong><br>
-    Se procede a registrar el movimiento del TV código interno <strong>${tv.codigo}</strong>, marca <strong>${tv.marca}</strong>, modelo <strong>${tv.modelo || '___'}</strong>, de <strong>${tv.tamano || '___'}</strong>, y serial <strong>${tv.serial}</strong>.<br>
-      <strong>Ubicación de Origen:</strong> ${origen} &rarr; <strong>Ubicación de Destino:</strong> ${destino}.<br>
-      ${mov.tvReemplazo ? `<strong>TV Reemplazado:</strong><br>
+    ${textoProcedimientoActivo(mov, tv)}<br>
+      ${mov.tvReemplazo ? `<strong>Detalle del TV Reemplazado:</strong><br>
       &nbsp;&nbsp;&nbsp;&nbsp;Código: <strong>${mov.tvReemplazo.codigo}</strong><br>
       &nbsp;&nbsp;&nbsp;&nbsp;Marca: <strong>${mov.tvReemplazo.marca}</strong>, Modelo: <strong>${mov.tvReemplazo.modelo}</strong><br>
       &nbsp;&nbsp;&nbsp;&nbsp;Tamaño: <strong>${mov.tvReemplazo.tamano}</strong>, Serial: <strong>${mov.tvReemplazo.serial}</strong><br>
       &nbsp;&nbsp;&nbsp;&nbsp;Reubicado a: <strong>${mov.tvReemplazo.destino}</strong>.<br>` : ''}
-      ${mov.tvSaliente ? `<strong>Destino del TV Saliente:</strong> <strong>${mov.tvSaliente}</strong>.<br>` : ''}
       <strong>Motivo del movimiento:</strong> ${motivo}<br>
       <strong>Responsable de la ejecución:</strong> ${respList.length ? respRaw : '______________________'}
     </div>
@@ -2689,14 +2749,12 @@ function openActaFromMov(e, movId) {
       En esta misma fecha, siendo las <u>&nbsp;${horaFmt}&nbsp;</u>, por instrucciones de la Gerencia General, se procede a realizar el siguiente movimiento de activo en el HPA.
       <br><br>
       <strong>Descripción del procedimiento:</strong><br>
-    Se procede a registrar el movimiento del TV código interno <strong>${tv.codigo}</strong>, marca <strong>${tv.marca}</strong>, modelo <strong>${tv.modelo || '___'}</strong>, de <strong>${tv.tamano || '___'}</strong>, y serial <strong>${tv.serial}</strong>.<br>
-      <strong>Ubicación de Origen:</strong> ${origen} &rarr; <strong>Ubicación de Destino:</strong> ${destino}.<br>
-      ${mov.tvReemplazo ? `<strong>TV Reemplazado:</strong><br>
+    ${textoProcedimientoActivo(mov, tv)}<br>
+      ${mov.tvReemplazo ? `<strong>Detalle del TV Reemplazado:</strong><br>
       &nbsp;&nbsp;&nbsp;&nbsp;Código: <strong>${mov.tvReemplazo.codigo}</strong><br>
       &nbsp;&nbsp;&nbsp;&nbsp;Marca: <strong>${mov.tvReemplazo.marca}</strong>, Modelo: <strong>${mov.tvReemplazo.modelo}</strong><br>
       &nbsp;&nbsp;&nbsp;&nbsp;Tamaño: <strong>${mov.tvReemplazo.tamano}</strong>, Serial: <strong>${mov.tvReemplazo.serial}</strong><br>
       &nbsp;&nbsp;&nbsp;&nbsp;Reubicado a: <strong>${mov.tvReemplazo.destino}</strong>.<br>` : ''}
-      ${mov.tvSaliente ? `<strong>Destino del TV Saliente:</strong> <strong>${mov.tvSaliente}</strong>.<br>` : ''}
       <strong>Motivo del movimiento:</strong> ${motivo}<br>
       <strong>Responsable de la ejecución:</strong> ${respList.length ? respRaw : '______________________'}
     </div>
