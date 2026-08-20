@@ -600,7 +600,7 @@ textarea { resize: vertical; min-height: 80px; }
   font-size: 1.25rem;
   font-weight: 800;
   color: #ffffff;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  text-shadow: 0 0 14px rgba(0,212,255,0.45), 0 1px 3px rgba(0,0,0,0.3);
   letter-spacing: 0.02em;
 }
 
@@ -613,13 +613,15 @@ textarea { resize: vertical; min-height: 80px; }
 
 /* ── Bloques de campo ── */
 .mov-field-block { display: flex; flex-direction: column; gap: 0.4rem; }
+.mov-field-block select { width: 100%; field-sizing: fixed; }
 
 .mov-field-label {
   font-size: 0.9rem;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--accent-hover);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  text-shadow: 0 0 8px rgba(0,212,255,0.35);
 }
 
 /* ── Tarjeta de TV seleccionado ── */
@@ -690,7 +692,7 @@ textarea { resize: vertical; min-height: 80px; }
   display: block;
   font-size: 0.68rem;
   font-weight: 700;
-  color: var(--text-muted);
+  color: var(--accent-hover);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   line-height: 1;
@@ -746,9 +748,10 @@ textarea { resize: vertical; min-height: 80px; }
 .mov-section-label {
   font-size: 0.9rem;
   font-weight: 700;
-  color: var(--text-primary);
+  color: var(--purple);
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  text-shadow: 0 0 8px rgba(179,110,255,0.35);
 }
 
 /* ── Tarjetas de tipo de movimiento ── */
@@ -798,7 +801,7 @@ textarea { resize: vertical; min-height: 80px; }
 .mov-tipo-txt {
   font-size: 0.65rem;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   text-align: center;
   line-height: 1.25;
   letter-spacing: 0.01em;
@@ -824,18 +827,20 @@ textarea { resize: vertical; min-height: 80px; }
   font-size: 0.85rem;
   font-weight: 800;
   letter-spacing: 0.1em;
-  color: var(--text-primary);
-  background: var(--bg-card);
-  border: 1px solid var(--border);
+  color: var(--green);
+  background: var(--green-bg);
+  border: 1px solid rgba(0,245,160,0.35);
   border-radius: 4px;
   padding: 0.15rem 0.45rem;
   display: inline-block;
+  text-shadow: 0 0 8px rgba(0,245,160,0.4);
 }
 
 .mov-ruta-tag-dest {
   color: var(--accent);
   border-color: rgba(99,179,237,0.3);
   background: var(--accent-glow);
+  text-shadow: 0 0 8px rgba(0,212,255,0.4);
 }
 
 .mov-ruta-select { width: 100%; }

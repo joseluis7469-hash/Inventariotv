@@ -233,6 +233,12 @@
 
           <!-- Selector de TV -->
           <div class="mov-field-block">
+            <label for="movOrigenFiltro" class="mov-field-label">📍 ¿De dónde vas a sacar el TV?</label>
+            <select id="movOrigenFiltro">
+              <option value="">Cargando…</option>
+            </select>
+          </div>
+          <div class="mov-field-block">
             <label for="movTV" class="mov-field-label">Buscar TV <span class="required">*</span></label>
             <select id="movTV" required></select>
           </div>
@@ -386,6 +392,17 @@
                   <input type="hidden" id="movTvSaliente" value="" />
                 </div>
               </div>
+            </div>
+          </div>
+
+          <!-- Sección: Condición del TV al llegar al Taller (Envío a Taller) -->
+          <div class="mov-section" id="grpMovTallerEstado" style="display:none;">
+            <div class="mov-field-block">
+              <label for="movTallerEstado" class="mov-field-label">🔧 Condición del TV al llegar al Taller <span class="required">*</span></label>
+              <select id="movTallerEstado">
+                <option value="inoperativo">Inoperativo</option>
+                <option value="operativo">Operativo</option>
+              </select>
             </div>
           </div>
 
@@ -618,6 +635,14 @@
                       <option value="inoperativo">Inoperativo</option>
                     </select>
                   </div>
+
+                  <div class="form-group form-group-col-4" id="grpTvTallerEstado" style="display: none;">
+                    <label for="tvTallerEstado">Condición en el Taller <span class="required">*</span></label>
+                    <select id="tvTallerEstado">
+                      <option value="inoperativo">Inoperativo</option>
+                      <option value="operativo">Operativo</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -718,6 +743,17 @@
     </div>
   </div>
 
+  <!-- MODAL: AVISO FECHA/HORA INCORRECTA -->
+  <div class="modal-overlay" id="modalHoraIncorrecta" style="z-index: 9999;">
+    <div class="modal modal-sm">
+      <div class="modal-header" style="background:rgba(255,183,77,0.15); border-bottom-color:rgba(255,183,77,0.3);">
+        <h3 style="color:#ffb74d;">🕒 Fecha/Hora del Sistema</h3>
+        <button class="modal-close" onclick="closeModal('modalHoraIncorrecta')">✕</button>
+      </div>
+      <div class="modal-body" id="modalHoraIncorrectaBody"></div>
+    </div>
+  </div>
+
   <!-- MODAL: CONFIRMAR ELIMINAR -->
   <div class="modal-overlay" id="modalConfirm">
     <div class="modal modal-sm">
@@ -777,7 +813,20 @@
             <option value="activo">🛏️ Solo en Habitación</option>
             <option value="taller">🔧 Solo en Taller</option>
             <option value="baja">❌ Solo Dados de Baja</option>
+            <option value="marca">🏷️ Por Marca</option>
           </select>
+        </div>
+        <div id="grupoEliminarListaBlock" style="margin-top:10px;">
+          <div class="form-group" id="grupoEliminarMarcaGrp" style="display:none;">
+            <label style="color:var(--text-secondary); font-size:0.8rem;">Marca a eliminar <span style="color:var(--danger)">*</span></label>
+            <select id="grupoEliminarMarca"></select>
+          </div>
+          <div style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:6px;">
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+              <input type="checkbox" id="grupoEliminarTodoMarca" style="width:auto; margin:0;"> Seleccionar todos
+            </label>
+          </div>
+          <div id="grupoEliminarLista" style="max-height:180px; overflow-y:auto; border:1px solid var(--border); border-radius:8px; padding:8px; font-size:0.85rem;"></div>
         </div>
         <div id="grupoEliminarInfo" style="font-size:0.8rem; color:var(--text-secondary); background:var(--bg-input); border:1px solid var(--border); border-radius:8px; padding:10px; margin-top:8px;"></div>
         <div class="form-group" style="margin-top:1rem;">

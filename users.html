@@ -1665,6 +1665,48 @@
       setTimeout(() => t.remove(), 3500);
     }
 
+    // ─── Navegación por teclado (Enter + flechas) en formularios y modales ───
+    document.addEventListener('keydown', e => {
+      const el = document.activeElement;
+      if (!el || el.tagName !== 'INPUT' || el.disabled || el.readOnly) return;
+      if (el.id === 'userSearch' || el.closest('.ts-wrapper')) return;
+      if (el.offsetParent === null) return;
+      const t = (el.getAttribute('type') || 'text').toLowerCase();
+      if (!['text','number','tel','email','password','search','url','datetime-local','date','time'].includes(t)) return;
+      if (e.key !== 'Enter' && e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      if (['datetime-local','date','time'].includes(t) && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) return;
+
+      const scope = el.closest('form') || el.closest('.modal-body');
+      if (!scope) return;
+      const campos = Array.from(scope.querySelectorAll('input, select, textarea')).filter(c => {
+        if (c.disabled || c.readOnly) return false;
+        if (c.hidden || c.style.display === 'none') return false;
+        if (c.closest('.ts-wrapper')) return false;
+        if (c.id === 'userSearch') return false;
+        if (c.tagName === 'INPUT') {
+          const ct = (c.getAttribute('type') || 'text').toLowerCase();
+          if (['hidden','button','submit','reset','file','checkbox','radio','image','color'].includes(ct)) return false;
+        }
+        if (c.offsetParent === null) return false;
+        return true;
+      });
+      if (campos.length < 2) return;
+      const idx = campos.indexOf(el);
+      if (idx === -1) return;
+
+      e.preventDefault();
+      let next = idx;
+      if (e.key === 'Enter' || e.key === 'ArrowDown') next = idx + 1;
+      else next = idx - 1;
+      if (next < 0) return;
+      if (next >= campos.length) {
+        const btn = scope.querySelector('button[type="submit"], .btn-primary');
+        if (btn) btn.focus();
+        return;
+      }
+      campos[next].focus();
+    });
+
     // Close modal on Escape
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') {

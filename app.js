@@ -207,10 +207,14 @@ function showToast(msg, type = 'success', duration = 3200) {
 
 let _lastFocusedElement = null;
 
-function openModal(id) {
+function openModal(id, focusSelector) {
   _lastFocusedElement = document.activeElement;
   document.getElementById(id).classList.add('open');
   const modal = document.getElementById(id);
+  if (focusSelector) {
+    const target = modal.querySelector(focusSelector);
+    if (target) { setTimeout(() => target.focus(), 60); return; }
+  }
   const firstFocusable = modal.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
   if (firstFocusable) setTimeout(() => firstFocusable.focus(), 100);
 }
@@ -789,7 +793,9 @@ document.getElementById('btnConfirmPhysicalDelete').addEventListener('click', as
     await db.collection('tvs').doc(_pendingPhysicalDeleteId).delete();
     
     // Eliminar físicamente sus movimientos (excepto los eventos del historial)
-    const movsToDelete = loadMovs().filter(m => String(m.tvId) === String(_pendingPhysicalDeleteId) && !m.esEvento);
+    const movsToDelete = loadAllMovs().filter(m => String(m.tvId) === String(_pendingPhysicalDeleteId) && !m.esEvento);
+    // Eliminar las imágenes de actas de esos movimientos en Storage
+    await eliminarActasDeMovimientos(movsToDelete);
     if (movsToDelete.length > 0) {
       const batch = db.batch();
       movsToDelete.forEach(m => {
@@ -864,6 +870,8 @@ function confirmarEliminacionFisicaMovimiento(movId) {
   if (!confirm(`⚠️ ELIMINACIÓN FÍSICA\n\n¿Eliminar permanentemente este movimiento?\n\nTipo: ${mov.tipo}\nFecha: ${mov.fecha}\nResponsable: ${mov.responsable}\n\nEsta acción no se puede deshacer.`)) return;
   db.collection('movimientos').doc(movId).delete()
     .then(async () => {
+      // Eliminar la imagen del acta en Storage (si existe)
+      await eliminarActasDeMovimientos([mov]);
       await registrarEventoTV({
         tipo: 'otro',
         tvId: mov.tvId,
@@ -877,6 +885,15 @@ function confirmarEliminacionFisicaMovimiento(movId) {
     .catch(e => showToast('Error: ' + e.message, 'error'));
 }
 
+// Eliminar imágenes de actas en Storage de una lista de movimientos
+async function eliminarActasDeMovimientos(movs) {
+  for (const m of movs) {
+    if (m.actaPath) {
+      try { await storage.ref(m.actaPath).delete(); } catch (e) { /* la imagen ya no existe */ }
+    }
+  }
+}
+
 // Eliminar acta de un movimiento (ELIMINACIÓN FÍSICA - Admin)
 function confirmarEliminarActaMovimiento(movId) {
   if (!hasPermission('eliminar_fisico_acta')) {
@@ -886,8 +903,10 @@ function confirmarEliminarActaMovimiento(movId) {
   const mov = loadMovs().find(m => String(m.id) === String(movId));
   if (!mov || !mov.actaUrl) return;
   if (!confirm('¿Eliminar el acta de este movimiento?\n\nEsta acción no se puede deshacer.')) return;
-  db.collection('movimientos').doc(movId).update({ actaUrl: firebase.firestore.FieldValue.delete() })
+  db.collection('movimientos').doc(movId).update({ actaUrl: firebase.firestore.FieldValue.delete(), actaPath: firebase.firestore.FieldValue.delete() })
     .then(async () => {
+      // Eliminar la imagen del acta en Storage
+      await eliminarActasDeMovimientos([mov]);
       await registrarEventoTV({
         tipo: 'acta_eliminada',
         tvId: mov.tvId,
@@ -1023,26 +1042,106 @@ function abrirEliminarPorGrupo() {
   }
   document.getElementById('grupoEliminarConfirm').value = '';
   document.getElementById('grupoEliminarTipo').selectedIndex = 0;
+  document.getElementById('grupoEliminarMarcaGrp').style.display = 'none';
   actualizarInfoGrupo();
+  renderGrupoEliminarLista();
   openModal('modalEliminarGrupo');
+}
+
+function obtenerTVsGrupoEliminar() {
+  const tipo = document.getElementById('grupoEliminarTipo').value;
+  let tvs = loadAllTVs();
+  if (tipo === 'marca') {
+    const marca = document.getElementById('grupoEliminarMarca').value;
+    if (marca) tvs = tvs.filter(t => t.marca === marca);
+  } else if (tipo !== 'todos') {
+    tvs = tvs.filter(t => t.estado === tipo);
+  }
+  return tvs;
+}
+
+function poblarMarcasGrupoEliminar() {
+  const sel = document.getElementById('grupoEliminarMarca');
+  if (!sel) return;
+  const marcas = new Set(loadAllTVs().map(t => t.marca).filter(Boolean));
+  const predef = ['LG', 'Samsung', 'Sony', 'Toshiba'];
+  const todas = Array.from(new Set([...predef, ...loadMarcas(), ...marcas])).filter(Boolean);
+  sel.innerHTML = todas.map(m => `<option value="${m}">${m}</option>`).join('');
+}
+
+function renderGrupoEliminarLista() {
+  const tipo = document.getElementById('grupoEliminarTipo').value;
+  const lista = document.getElementById('grupoEliminarLista');
+  const tvs = obtenerTVsGrupoEliminar();
+  if (tipo === 'marca' && !document.getElementById('grupoEliminarMarca').value) {
+    lista.innerHTML = '<div style="color:var(--text-secondary);">Selecciona una marca.</div>';
+    actualizarInfoGrupo();
+    return;
+  }
+  if (tvs.length === 0) {
+    lista.innerHTML = '<div style="color:var(--text-secondary);">No hay registros que coincidan con esta opción.</div>';
+    document.getElementById('grupoEliminarTodoMarca').checked = false;
+    actualizarInfoGrupo();
+    return;
+  }
+  lista.innerHTML = tvs.map(t =>
+    `<label style="display:flex; align-items:center; gap:8px; padding:6px 4px; border-bottom:1px solid var(--border); cursor:pointer;">
+      <input type="checkbox" class="chkEliminarMarca" data-id="${t.id}" style="width:auto; margin:0; flex-shrink:0;">
+      <span>${t.codigo} — ${t.marca} — ${t.serial || 's/s'}</span>
+    </label>`
+  ).join('');
+  document.getElementById('grupoEliminarTodoMarca').checked = false;
+  actualizarInfoGrupo();
 }
 
 function actualizarInfoGrupo() {
   const tipo = document.getElementById('grupoEliminarTipo').value;
   const tvs = loadAllTVs();
+  const el = document.getElementById('grupoEliminarInfo');
+  if (tipo === 'marca') {
+    const marca = document.getElementById('grupoEliminarMarca').value;
+    const checks = document.querySelectorAll('.chkEliminarMarca:checked');
+    if (el) el.textContent = marca
+      ? `Se eliminarán permanentemente ${checks.length} registro(s) seleccionados de la marca ${marca}.`
+      : 'Selecciona una marca.';
+    return;
+  }
   let count = 0;
   if (tipo === 'todos') {
     count = tvs.length;
   } else {
     count = tvs.filter(t => t.estado === tipo).length;
   }
-  const el = document.getElementById('grupoEliminarInfo');
-  if (el) el.textContent = `Se eliminarán permanentemente ${count} registro(s).`;
+  const checks = document.querySelectorAll('.chkEliminarMarca:checked');
+  if (el) el.textContent = `Se eliminarán permanentemente ${checks.length} de ${count} registro(s) del grupo seleccionado.`;
 }
 
 function setupEliminarGrupoListener() {
   const sel = document.getElementById('grupoEliminarTipo');
-  if (sel) sel.addEventListener('change', actualizarInfoGrupo);
+  if (sel) sel.addEventListener('change', () => {
+    const tipo = sel.value;
+    const marcaGrp = document.getElementById('grupoEliminarMarcaGrp');
+    if (tipo === 'marca') {
+      marcaGrp.style.display = 'block';
+      poblarMarcasGrupoEliminar();
+      renderGrupoEliminarLista();
+    } else {
+      marcaGrp.style.display = 'none';
+      renderGrupoEliminarLista();
+    }
+  });
+  const selMarca = document.getElementById('grupoEliminarMarca');
+  if (selMarca) selMarca.addEventListener('change', renderGrupoEliminarLista);
+  const chkTodo = document.getElementById('grupoEliminarTodoMarca');
+  if (chkTodo) chkTodo.addEventListener('change', () => {
+    document.querySelectorAll('.chkEliminarMarca').forEach(c => c.checked = chkTodo.checked);
+    actualizarInfoGrupo();
+  });
+  document.addEventListener('change', e => {
+    if (e.target && e.target.classList && e.target.classList.contains('chkEliminarMarca')) {
+      actualizarInfoGrupo();
+    }
+  });
   const btn = document.getElementById('btnConfirmEliminarGrupo');
   if (!btn) return;
   btn.addEventListener('click', async () => {
@@ -1056,21 +1155,28 @@ function setupEliminarGrupoListener() {
     btn.textContent = 'Eliminando...';
     btn.disabled = true;
     try {
-      let tvsAEliminar = loadAllTVs();
-      if (tipo !== 'todos') tvsAEliminar = tvsAEliminar.filter(t => t.estado === tipo);
-      const ids = tvsAEliminar.map(t => t.id);
-      if (ids.length === 0) {
+      const selectedIds = Array.from(document.querySelectorAll('.chkEliminarMarca:checked')).map(c => c.dataset.id);
+      let tvsAEliminar = obtenerTVsGrupoEliminar().filter(t => selectedIds.includes(t.id));
+      if (tipo === 'marca' && !document.getElementById('grupoEliminarMarca').value) {
         closeModal('modalEliminarGrupo');
-        showToast('No hay registros en este grupo.', 'info');
+        showToast('Selecciona una marca.', 'info');
         return;
       }
+      if (tvsAEliminar.length === 0) {
+        closeModal('modalEliminarGrupo');
+        showToast('Selecciona al menos un registro de la lista.', 'info');
+        return;
+      }
+      const ids = tvsAEliminar.map(t => t.id);
       // Registrar evento para cada TV eliminado
       for (const tv of tvsAEliminar) {
         await registrarEventoTV({
           tipo: 'tv_eliminado_fisico',
           tvId: tv.id,
           codigo: tv.codigo,
-          detalle: `TV ${tv.codigo} eliminado permanentemente (eliminación por grupo: ${tipo === 'todos' ? 'todos' : tipo})`
+          detalle: tipo === 'marca'
+            ? `TV ${tv.codigo} eliminado permanentemente (eliminación por marca: ${document.getElementById('grupoEliminarMarca').value})`
+            : `TV ${tv.codigo} eliminado permanentemente (eliminación por grupo: ${tipo === 'todos' ? 'todos' : tipo})`
         });
       }
       // Eliminar físicamente cada TV
@@ -1081,14 +1187,18 @@ function setupEliminarGrupoListener() {
       const movsSnap = await db.collection('movimientos').get();
       const batch = db.batch();
       let ops = 0;
+      const movsToDelete = [];
       movsSnap.docs.forEach(doc => {
         const m = doc.data();
         if (!m.esEvento && ids.includes(String(m.tvId))) {
           batch.delete(doc.ref);
+          movsToDelete.push(m);
           ops++;
         }
       });
       if (ops > 0) await batch.commit();
+      // Eliminar las imágenes de actas de los movimientos eliminados en Storage
+      await eliminarActasDeMovimientos(movsToDelete);
 
       closeModal('modalEliminarGrupo');
       showToast(`${ids.length} registro(s) eliminados permanentemente.`, 'success');
@@ -1217,6 +1327,11 @@ function resetFormTV() {
   document.getElementById('tvUbicacionOtro').value = '';
   document.getElementById('grpTvHabitacion').style.display = 'none';
   document.getElementById('tvHabitacion').value = '';
+  const grpTvTaller = document.getElementById('grpTvTallerEstado');
+  if (grpTvTaller) {
+    grpTvTaller.style.display = 'none';
+    document.getElementById('tvTallerEstado').value = 'inoperativo';
+  }
   
   renderMarcas();
   document.getElementById('tvMarca').value = '';
@@ -1232,6 +1347,13 @@ function resetFormTV() {
 document.getElementById('tvUbicacion').addEventListener('change', function() {
   document.getElementById('grpUbicacionOtro').style.display = this.value === 'otro' ? '' : 'none';
   document.getElementById('grpTvHabitacion').style.display = (this.value === 'Habitacion' || this.value === 'Habitación') ? '' : 'none';
+  const grpTvTaller = document.getElementById('grpTvTallerEstado');
+  if (grpTvTaller) {
+    grpTvTaller.style.display = this.value === 'Taller' ? '' : 'none';
+    if (this.value === 'Taller') {
+      document.getElementById('tvTallerEstado').value = 'inoperativo';
+    }
+  }
 });
 
 document.getElementById('btnClearFechaIngreso').addEventListener('click', function() {
@@ -1403,8 +1525,8 @@ function abrirModalSinTV() {
 function abrirModalTaller() {
   const tvs = loadTVs().filter(t => t.estado === 'taller' || String(t.ubicacion || '').toLowerCase() === 'taller');
   const body = document.getElementById('modalTallerBody');
-  const operativos = tvs.filter(t => t.estado === 'operativo' || t.estado === 'activo');
-  const inoperativos = tvs.filter(t => t.estado === 'inoperativo' || t.estado === 'taller' || t.estado === 'baja');
+  const operativos = tvs.filter(t => (t.tallerEstado || 'inoperativo') === 'operativo');
+  const inoperativos = tvs.filter(t => (t.tallerEstado || 'inoperativo') === 'inoperativo');
 
   let html = '';
   if (!tvs.length) {
@@ -1433,7 +1555,7 @@ function abrirModalTaller() {
               <td>${t.marca}</td>
               <td>${t.modelo || '—'}</td>
               <td style="font-size:0.78rem;color:var(--text-secondary)">${t.serial}</td>
-              <td>${estadoBadge[t.estado] || t.estado}</td>
+              <td>${t.tallerEstado === 'operativo' ? estadoBadge.operativo : estadoBadge.inoperativo}</td>
             </tr>
           `).join('')}
         </tbody>
@@ -1492,6 +1614,12 @@ document.getElementById('asignarArea').addEventListener('change', function() {
   } else {
     toggleAsignarHabNumero(this.value);
   }
+  const selHab = document.getElementById('asignarHabNumero');
+  if (selHab && !selHab.disabled && selHab.options.length > 1) selHab.focus();
+});
+
+document.getElementById('asignarHabNumero').addEventListener('change', function() {
+  if (this.value) document.getElementById('asignarResponsable').focus();
 });
 
 
@@ -1545,6 +1673,12 @@ function editarTV(id) {
   const esHabitacion = tv.ubicacion === 'Habitacion' || tv.ubicacion === 'Habitación';
   document.getElementById('grpTvHabitacion').style.display = esHabitacion ? '' : 'none';
   document.getElementById('tvHabitacion').value = tv.habitacion || '';
+  const grpTvTaller = document.getElementById('grpTvTallerEstado');
+  if (grpTvTaller) {
+    const esTaller = String(tv.ubicacion || '').toLowerCase() === 'taller';
+    grpTvTaller.style.display = esTaller ? '' : 'none';
+    document.getElementById('tvTallerEstado').value = tv.tallerEstado || 'inoperativo';
+  }
   
   currentImgTrasera = tv.imgTrasera || '';
   currentImgFile = null;
@@ -1695,6 +1829,7 @@ document.getElementById('formTV').addEventListener('submit', e => {
     habitacion:   (ubicacionVal === 'Habitacion' || ubicacionVal === 'Habitación') ? get('tvHabitacion') : '',
     imgTrasera:   currentImgTrasera,
     estado:       get('tvEstado'),
+    tallerEstado: (String(ubicacionVal || '').toLowerCase() === 'taller') ? document.getElementById('tvTallerEstado').value : '',
     observaciones:get('tvObservaciones'),
     updatedAt:    new Date().toISOString()
   };
@@ -1739,6 +1874,22 @@ document.getElementById('formTV').addEventListener('submit', e => {
 });
 
 // ─── FORMULARIO MOVIMIENTO ───────────────────────────────────
+function renderMovOrigenFiltro() {
+  const sel = document.getElementById('movOrigenFiltro');
+  if (!sel) return;
+  const selected = sel.value;
+  const custom = loadUbicaciones();
+  const lugares = ['Sala de Juntas', ...custom.filter(u => u && u !== 'Sala de Juntas')];
+  sel.innerHTML = `
+    <option value="">Todos los lugares</option>
+    <option value="Habitacion">🏨 Habitaciones</option>
+    <option value="Taller">🔧 Taller</option>
+    <option value="Almacen">📦 Almacén</option>
+    ${lugares.map(u => `<option value="lugar:${u}">🏢 ${u}</option>`).join('')}
+  `;
+  if (selected) sel.value = selected;
+}
+
 function populateMovTV() {
   const tvs = loadTVs();
   const sel = document.getElementById('movTV');
@@ -1746,8 +1897,22 @@ function populateMovTV() {
     if (window.movTVTomSelect) {
       window.movTVTomSelect.destroy();
     }
+    renderMovOrigenFiltro();
+    const filtro = document.getElementById('movOrigenFiltro');
+    const filtroVal = filtro ? filtro.value : '';
+    let lista = tvs.filter(t => t.estado !== 'baja');
+    if (filtroVal === 'Habitacion') {
+      lista = lista.filter(t => (t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') && t.estado !== 'taller');
+    } else if (filtroVal === 'Taller') {
+      lista = lista.filter(t => (t.estado === 'taller' || String(t.ubicacion || '').toLowerCase() === 'taller') && t.tallerEstado === 'operativo');
+    } else if (filtroVal === 'Almacen') {
+      lista = lista.filter(t => t.ubicacion === 'Almacen');
+    } else if (filtroVal && filtroVal.startsWith('lugar:')) {
+      const lugar = filtroVal.slice(6);
+      lista = lista.filter(t => t.ubicacion === lugar);
+    }
     sel.innerHTML = '<option value="">-- Seleccionar TV --</option>' +
-      tvs.filter(t => t.estado !== 'baja' && t.ubicacion !== 'Almacen').map(t =>
+      lista.map(t =>
         `<option value="${t.id}" data-codigo="${t.codigo}" data-marca="${t.marca}" data-modelo="${t.modelo || ''}" data-serial="${t.serial}" data-ubi="${t.ubicacion === 'Habitacion' ? ('Hab. ' + (t.habitacion || '?')) : (t.ubicacion || '—')}">[${t.codigo}] ${t.marca} ${t.modelo || ''} · S/N: ${t.serial}</option>`
       ).join('');
       
@@ -1818,6 +1983,43 @@ function populateMovTV() {
   document.querySelectorAll('.mov-tipo-btn').forEach(b => b.classList.remove('selected'));
   
   adjustMovDestinoHabWidth();
+}
+
+// Al cambiar el filtro de origen, repoblar la lista y mostrar el listado
+const movOrigenFiltroEl = document.getElementById('movOrigenFiltro');
+if (movOrigenFiltroEl) {
+  movOrigenFiltroEl.addEventListener('change', function() {
+    const tvs = loadTVs();
+    const val = this.value;
+    let lista = tvs.filter(t => t.estado !== 'baja');
+    if (val === 'Habitacion') {
+      lista = lista.filter(t => (t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') && t.estado !== 'taller');
+    } else if (val === 'Taller') {
+      lista = lista.filter(t => (t.estado === 'taller' || String(t.ubicacion || '').toLowerCase() === 'taller') && t.tallerEstado === 'operativo');
+    } else if (val === 'Almacen') {
+      lista = lista.filter(t => t.ubicacion === 'Almacen');
+    } else if (val && val.startsWith('lugar:')) {
+      const lugar = val.slice(6);
+      lista = lista.filter(t => t.ubicacion === lugar);
+    }
+
+    if (lista.length === 0) {
+      showToast('No hay TVs en ese lugar.', 'info');
+      if (window.movTVTomSelect) {
+        window.movTVTomSelect.clear();
+        window.movTVTomSelect.close();
+      }
+      _movUpdateTVCard(null);
+      const origenInput = document.getElementById('movOrigen');
+      if (origenInput) origenInput.value = 'Sin TV seleccionado';
+      return;
+    }
+
+    populateMovTV();
+    if (window.movTVTomSelect) {
+      window.movTVTomSelect.open();
+    }
+  });
 }
 
 /** Actualiza la tarjeta de info del TV en el panel izquierdo y activa/desactiva el overlay */
@@ -1900,6 +2102,14 @@ document.querySelectorAll('.mov-tipo-btn').forEach(btn => {
     const sel = document.getElementById('movTipo');
     if (sel) sel.value = btn.dataset.val;
 
+    const grpMovTaller = document.getElementById('grpMovTallerEstado');
+    if (grpMovTaller) {
+      grpMovTaller.style.display = btn.dataset.val === 'entrada_taller' ? '' : 'none';
+      if (btn.dataset.val === 'entrada_taller') {
+        document.getElementById('movTallerEstado').value = 'inoperativo';
+      }
+    }
+
     const destInput = document.getElementById('movDestino');
     const destSelect = document.getElementById('movDestinoSelect');
 
@@ -1956,6 +2166,11 @@ function selectTvSaliente(val) {
   if (btn) btn.classList.add('selected');
   document.getElementById('movTvSaliente').value = val;
   const otroInput = document.getElementById('movTvSalienteOtro');
+  const grpMovTaller = document.getElementById('grpMovTallerEstado');
+  if (grpMovTaller) {
+    grpMovTaller.style.display = val === 'taller' ? '' : 'none';
+    if (val === 'taller') document.getElementById('movTallerEstado').value = 'inoperativo';
+  }
   if (val === 'otro') {
     otroInput.style.display = '';
     otroInput.focus();
@@ -2516,6 +2731,13 @@ function openActaFromMov(e, movId) {
 
 function resetFormMovimiento() {
   document.getElementById('formMovimiento').reset();
+  const grpMovTaller = document.getElementById('grpMovTallerEstado');
+  if (grpMovTaller) {
+    grpMovTaller.style.display = 'none';
+    document.getElementById('movTallerEstado').value = 'inoperativo';
+  }
+  const filtroOrigen = document.getElementById('movOrigenFiltro');
+  if (filtroOrigen) filtroOrigen.value = '';
   populateMovTV();
   const grp = document.getElementById('grpMovDestinoHab');
   if (grp) grp.style.display = 'none';
@@ -2637,7 +2859,14 @@ document.getElementById('formMovimiento').addEventListener('submit', async e => 
       } else {
         reempUpdates.habitacion = '';
         reempUpdates.ubicacion = reemp.destino;
-        if (reemp.destino.toLowerCase().includes('taller')) reempUpdates.estado = 'taller';
+        if (reemp.destino.toLowerCase().includes('taller')) {
+          reempUpdates.estado = 'taller';
+          reempUpdates.tallerEstado = document.getElementById('movTallerEstado').value || 'inoperativo';
+        } else if (reemp.destino.toLowerCase().includes('baja')) {
+          reempUpdates.estado = 'baja';
+        } else if (reemp.destino.toLowerCase().includes('almacén') || reemp.destino.toLowerCase() === 'almacen') {
+          reempUpdates.estado = 'activo';
+        }
       }
       await db.collection('tvs').doc(reemp.id).update(reempUpdates);
       window._tvReemplazo = null;
@@ -2647,13 +2876,13 @@ document.getElementById('formMovimiento').addEventListener('submit', async e => 
     const tv = tvs.find(t => String(t.id) === String(tvId));
     if (tv) {
       const updates = {};
-      if (tipo === 'entrada_taller')  updates.estado = 'taller';
-      if (tipo === 'retorno_taller')  { updates.estado = 'activo'; if (mov.habDestino) { updates.habitacion = mov.habDestino; updates.piso = mov.pisoDestino || tv.piso; } }
+      if (tipo === 'entrada_taller')  { updates.estado = 'taller'; updates.tallerEstado = document.getElementById('movTallerEstado').value || 'inoperativo'; }
+      if (tipo === 'retorno_taller')  { updates.estado = 'activo'; updates.tallerEstado = ''; if (mov.habDestino) { updates.ubicacion = 'Habitacion'; updates.habitacion = mov.habDestino; if (mov.pisoDestino || tv.piso) updates.piso = mov.pisoDestino || tv.piso; } }
       if (tipo === 'baja')            updates.estado = 'baja';
       if (tipo === 'reingreso')       updates.estado = 'activo';
       if (tipo === 'traslado_hab')    {
         updates.estado = 'activo';
-        if (mov.habDestino) { updates.habitacion = mov.habDestino; updates.piso = mov.pisoDestino || tv.piso; }
+        if (mov.habDestino) { updates.ubicacion = 'Habitacion'; updates.habitacion = mov.habDestino; if (mov.pisoDestino || tv.piso) updates.piso = mov.pisoDestino || tv.piso; }
       }
       if (Object.keys(updates).length > 0) {
         await db.collection('tvs').doc(tvId).update(updates);
@@ -2853,7 +3082,6 @@ function abrirAsignarHabitacion(tvId) {
   document.getElementById('asignarResponsable').value = '';
   document.getElementById('asignarNota').value        = '';
   document.querySelectorAll('.asignar-resp-input').forEach((inp, i) => { if (i > 0) inp.value = ''; });
-
   const now = new Date();
   const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, '0');
@@ -2862,7 +3090,7 @@ function abrirAsignarHabitacion(tvId) {
   const mm = String(now.getMinutes()).padStart(2, '0');
   document.getElementById('asignarFechaIngreso').value = `${y}-${m}-${d}T${hh}:${mm}`;
 
-  openModal('modalAsignar');
+  openModal('modalAsignar', '#asignarArea');
 }
 
 document.getElementById('btnClearAsignarFecha').addEventListener('click', function() {
@@ -3371,18 +3599,65 @@ function imprimirReporte(tipo) {
   };
 })();
 
-// ─── RESPONSABLES: navegación con Enter ────────────────────────
-document.querySelectorAll('.mov-resp-input').forEach((input, idx, inputs) => {
-  input.addEventListener('keydown', e => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      if (idx < inputs.length - 1) {
-        inputs[idx + 1].focus();
-      } else {
-        document.getElementById('movMotivo').focus();
-      }
+// ─── NAVEGACIÓN POR TECLADO EN FORMULARIOS Y MODALES ──────────
+// Flechas (↑/↓) y Enter permiten moverse entre los campos de ingreso
+// de datos en todas las interfaces (formTV, movimientos, asignación,
+// cambio de serial, eliminar registros, etc.).
+
+const TIPOS_TEXT_NAV = new Set(['text','number','tel','email','password','search','url','datetime-local','date','time','month','week']);
+
+function campoEsOrigenNavegacion(el) {
+  if (!el || el.tagName !== 'INPUT') return false;
+  if (el.disabled || el.readOnly) return false;
+  if (el.id === 'searchInventario' || el.id === 'searchHistorial') return false;
+  if (el.closest('.ts-wrapper')) return false;
+  if (el.offsetParent === null) return false;
+  return TIPOS_TEXT_NAV.has((el.getAttribute('type') || 'text').toLowerCase());
+}
+
+function camposNavegablesDelScope(scope) {
+  return Array.from(scope.querySelectorAll('input, select, textarea')).filter(el => {
+    if (el.disabled || el.readOnly) return false;
+    if (el.hidden || el.style.display === 'none') return false;
+    if (el.closest('.ts-wrapper')) return false;
+    if (el.id === 'searchInventario' || el.id === 'searchHistorial') return false;
+    if (el.tagName === 'INPUT') {
+      const type = (el.getAttribute('type') || 'text').toLowerCase();
+      if (['hidden','button','submit','reset','file','checkbox','radio','image','color'].includes(type)) return false;
     }
+    if (el.offsetParent === null) return false;
+    return true;
   });
+}
+
+document.addEventListener('keydown', e => {
+  const el = document.activeElement;
+  if (!campoEsOrigenNavegacion(el)) return;
+  if (e.key !== 'Enter' && e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+
+  // Los selectores de fecha usan las flechas para cambiar el segmento seleccionado
+  const type = (el.getAttribute('type') || 'text').toLowerCase();
+  if (['datetime-local','date','time','month','week'].includes(type) && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) return;
+
+  const scope = el.closest('form') || el.closest('.modal-body');
+  if (!scope) return;
+  const campos = camposNavegablesDelScope(scope);
+  if (campos.length < 2) return;
+  const idx = campos.indexOf(el);
+  if (idx === -1) return;
+
+  e.preventDefault();
+  let next = idx;
+  if (e.key === 'Enter' || e.key === 'ArrowDown') next = idx + 1;
+  else next = idx - 1;
+
+  if (next < 0) return;
+  if (next >= campos.length) {
+    const btn = scope.querySelector('button[type="submit"], .btn-primary');
+    if (btn) btn.focus();
+    return;
+  }
+  campos[next].focus();
 });
 
 // ─── INIT ─────────────────────────────────────────────────────

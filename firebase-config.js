@@ -163,6 +163,77 @@ function checkAppReady() {
     } else {
       showPage('dashboard');
     }
+    verificarHoraSistema();
+  }
+}
+
+// ─── VALIDACIÓN DE FECHA/HORA DEL SISTEMA ─────────────────────
+// Al iniciar sesión se compara la hora del computador con la hora real.
+// Si la diferencia supera la tolerancia, se solicita actualizarla.
+let _horaVerificada = false;
+
+function obtenerHoraServidor() {
+  // 1) API pública de tiempo (con CORS) como fuente principal
+  return fetch('https://worldtimeapi.org/api/ip')
+    .then(r => r.json())
+    .then(d => {
+      if (d && d.unixtime) return d.unixtime * 1000;
+      throw new Error('Sin unixtime');
+    })
+    .catch(() => {
+      // 2) Respaldo: timestamp del servidor de Firestore
+      const tempRef = db.collection('config').doc('_hora_check');
+      return tempRef.set({ ts: firebase.firestore.FieldValue.serverTimestamp() })
+        .then(() => tempRef.get())
+        .then(snap => {
+          const ts = snap.get('ts');
+          return tempRef.delete().then(() => (ts ? ts.toMillis() : null));
+        });
+    });
+}
+
+function fmtHoraLocal(ms) {
+  const d = new Date(ms);
+  const pad = n => String(n).padStart(2, '0');
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+async function verificarHoraSistema() {
+  if (_horaVerificada) return;
+  _horaVerificada = true;
+  try {
+    const serverMs = await obtenerHoraServidor();
+    if (!serverMs) return;
+    const localMs = Date.now();
+    // Tolerancia de ±60 segundos
+    if (Math.abs(serverMs - localMs) > 60000) {
+      const body = document.getElementById('modalHoraIncorrectaBody');
+      if (body) {
+        const diffMin = Math.round(Math.abs(serverMs - localMs) / 60000);
+        body.innerHTML = `
+          <div style="background:rgba(255,183,77,0.1); border:1px solid rgba(255,183,77,0.3); border-radius:8px; padding:12px; margin-bottom:1rem;">
+            <p style="font-weight:700; color:#ffb74d; margin-bottom:6px;">⚠️ La fecha y hora del computador no son correctas</p>
+            <p style="font-size:0.85rem; color:var(--text-secondary);">La hora del sistema está desfasada aproximadamente <strong style="color:#ffb74d;">${diffMin} minuto(s)</strong> respecto a la hora real.</p>
+          </div>
+          <div class="form-group">
+            <label style="color:var(--text-secondary); font-size:0.8rem;">🖥️ Hora del computador</label>
+            <input type="text" value="${fmtHoraLocal(localMs)}" readonly style="width:100%; background:rgba(255,77,109,0.1); border-color:rgba(255,77,109,0.4); color:#ff4d6d; font-weight:700;" />
+          </div>
+          <div class="form-group">
+            <label style="color:var(--text-secondary); font-size:0.8rem;">🌐 Hora real</label>
+            <input type="text" value="${fmtHoraLocal(serverMs)}" readonly style="width:100%; background:rgba(0,245,160,0.1); border-color:rgba(0,245,160,0.4); color:#00f5a0; font-weight:700;" />
+          </div>
+          <p style="font-size:0.85rem; color:var(--text-secondary); margin-top:0.5rem;">Por favor, <strong>actualiza la fecha y hora del computador</strong> (Configuración del sistema) para que los registros guarden la hora correcta.</p>
+          <div class="form-actions" style="margin-top:1.2rem;">
+            <button class="btn btn-secondary" onclick="closeModal('modalHoraIncorrecta')">Entendido</button>
+            <button class="btn btn-primary" onclick="location.reload()">Ya la actualicé</button>
+          </div>
+        `;
+        openModal('modalHoraIncorrecta');
+      }
+    }
+  } catch (e) {
+    console.warn('No se pudo verificar la hora del sistema:', e);
   }
 }
 
