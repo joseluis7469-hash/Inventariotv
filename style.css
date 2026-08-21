@@ -599,8 +599,7 @@ textarea { resize: vertical; min-height: 80px; }
 .mov-panel-title {
   font-size: 1.25rem;
   font-weight: 800;
-  color: #ffffff;
-  text-shadow: 0 0 14px rgba(0,212,255,0.45), 0 1px 3px rgba(0,0,0,0.3);
+  color: #000000;
   letter-spacing: 0.02em;
 }
 
@@ -618,10 +617,9 @@ textarea { resize: vertical; min-height: 80px; }
 .mov-field-label {
   font-size: 0.9rem;
   font-weight: 700;
-  color: var(--accent-hover);
+  color: #000000;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  text-shadow: 0 0 8px rgba(0,212,255,0.35);
 }
 
 /* ── Tarjeta de TV seleccionado ── */
@@ -701,10 +699,14 @@ textarea { resize: vertical; min-height: 80px; }
 
 .mov-tv-info-val {
   display: block;
+  font-family: inherit;
   font-size: 0.85rem;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text-primary);
-  line-height: 1.2;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
 }
 
 /* ── Placeholder (sin TV seleccionado) ── */
@@ -748,10 +750,9 @@ textarea { resize: vertical; min-height: 80px; }
 .mov-section-label {
   font-size: 0.9rem;
   font-weight: 700;
-  color: var(--purple);
+  color: #000000;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  text-shadow: 0 0 8px rgba(179,110,255,0.35);
 }
 
 /* ── Tarjetas de tipo de movimiento ── */
@@ -2146,32 +2147,63 @@ textarea { resize: vertical; min-height: 80px; }
 }
 
 /* ─── REUBICAR TV MODAL ─────────────────────────────── */
+#modalReemplazo .modal { max-width: 620px; }
+#modalReemplazo .modal-body { background: #ffffff; border-radius: 0 0 14px 14px; }
+#modalReemplazo .modal-header { background: linear-gradient(135deg, #0a1e42, #071428); }
 .reloc-alert {
   display: flex; align-items: flex-start; gap: 0.75rem;
-  background: rgba(255,183,77,0.08); border: 1px solid rgba(255,183,77,0.25);
+  background: #fff4e0; border: 1px solid #ffb74d;
   border-radius: 10px; padding: 0.85rem 1rem; margin-bottom: 1.2rem;
 }
-.reloc-alert-icon { font-size: 1.2rem; line-height: 1; }
-.reloc-alert-text { color: var(--text-secondary); margin: 0; font-size: 0.9rem; line-height: 1.5; }
-.reloc-question { font-weight: 600; color: var(--text-primary); margin-bottom: 1rem; font-size: 0.95rem; }
+.reloc-alert-icon { font-size: 1.2rem; line-height: 1; flex-shrink: 0; }
+.reloc-alert-text {
+  color: #4a3a1f; margin: 0; font-size: 0.9rem; line-height: 1.5;
+  flex: 1; min-width: 0;
+  overflow-wrap: anywhere; word-break: break-word; white-space: normal;
+}
+.reloc-question { font-weight: 700; color: #0a1e42; margin-bottom: 1rem; font-size: 0.95rem; }
 .reloc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
 .reloc-card {
   display: flex; align-items: center; gap: 0.7rem; text-align: left;
   padding: 1rem 1.1rem; border-radius: 12px; cursor: pointer;
   transition: var(--transition); font-size: 0.9rem; line-height: 1.4;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
-.reloc-card:hover { transform: translateY(-2px); }
+.reloc-card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.25); }
 .reloc-icon { font-size: 1.5rem; flex-shrink: 0; }
-.reloc-label strong { display: block; }
-.reloc-label small { opacity: 0.7; font-size: 0.78rem; }
-.reloc-taller  { background: rgba(255,183,77,0.10); border: 1px solid rgba(255,183,77,0.30); color: #ffb74d; }
-.reloc-taller:hover { background: rgba(255,183,77,0.20); border-color: rgba(255,183,77,0.5); }
-.reloc-almacen { background: rgba(129,199,132,0.10); border: 1px solid rgba(129,199,132,0.30); color: #81c784; }
-.reloc-almacen:hover { background: rgba(129,199,132,0.20); border-color: rgba(129,199,132,0.5); }
-.reloc-baja    { background: rgba(255,107,107,0.10); border: 1px solid rgba(255,107,107,0.30); color: #ff6b6b; }
-.reloc-baja:hover { background: rgba(255,107,107,0.20); border-color: rgba(255,107,107,0.5); }
-.reloc-otro    { background: rgba(0,212,255,0.10); border: 1px solid rgba(0,212,255,0.30); color: var(--accent); }
-.reloc-otro:hover { background: rgba(0,212,255,0.20); border-color: rgba(0,212,255,0.5); }
+.reloc-label strong { display: block; font-size: 0.95rem; }
+.reloc-label small { opacity: 0.8; font-size: 0.78rem; }
+.reloc-taller  { background: #3a2a10; border: 2px solid #ff9800; color: #ffcc80; }
+.reloc-taller:hover { background: #4a3515; border-color: #f57c00; }
+.reloc-almacen { background: #12301a; border: 2px solid #4caf50; color: #a5d6a7; }
+.reloc-almacen:hover { background: #1a3d24; border-color: #388e3c; }
+.reloc-baja    { background: #3a1218; border: 2px solid #ef5350; color: #ff8a80; }
+.reloc-baja:hover { background: #4a171e; border-color: #e53935; }
+.reloc-otro    { background: #0f2b30; border: 2px solid #00bcd4; color: #80deea; }
+.reloc-otro:hover { background: #133840; border-color: #0097a7; }
+#reemplazoTallerEstadoGroup,
+#reemplazoOtroGroup {
+  background: #f0f9ff;
+  border: 1px solid #00bcd4;
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+}
+#reemplazoTallerEstadoGroup .mov-field-label,
+#reemplazoOtroGroup .mov-field-label { color: #0a1e42; }
+#reemplazoTallerEstado { padding: 0.6rem 0.8rem; }
+#modalReemplazo select,
+#modalReemplazo input[type="text"],
+#modalReemplazo textarea {
+  background: #ffffff;
+  border: 1px solid #94a3b8;
+  color: #0f172a;
+}
+#modalReemplazo select option { background: #ffffff; color: #0f172a; }
+#modalReemplazo select:focus,
+#modalReemplazo input[type="text"]:focus {
+  border-color: #00bcd4;
+  box-shadow: 0 0 0 3px rgba(0,188,212,0.25);
+}
 
 /* ─── FIELD HIGHLIGHT ON VALIDATION ERROR ───────────── */
 @keyframes highlightPulse {

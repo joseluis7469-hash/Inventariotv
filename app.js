@@ -374,13 +374,13 @@ function renderDashboard() {
   const sinTV = getHabitacionesSinTV();
   document.getElementById('stat-sintv').textContent = sinTV.length;
 
-  // Últimos movimientos
+  // Últimos movimientos (ordenados por momento real de creación, en caliente)
   const elMov = document.getElementById('dash-movimientos');
   const recientes = [...movs].sort((a, b) => {
-    const fa = a.fecha || '';
-    const fb = b.fecha || '';
-    const aDesconocida = fa.includes('desconocida') || !fa;
-    const bDesconocida = fb.includes('desconocida') || !fb;
+    const fa = (a.creadoEn || a.fecha || '');
+    const fb = (b.creadoEn || b.fecha || '');
+    const aDesconocida = !fa || fa.includes('desconocida') || fa.includes('0001') || fa.includes('0000');
+    const bDesconocida = !fb || fb.includes('desconocida') || fb.includes('0001') || fb.includes('0000');
     if (aDesconocida && bDesconocida) return 0;
     if (aDesconocida) return 1;
     if (bDesconocida) return -1;
@@ -459,7 +459,7 @@ function renderInventario(filtroEstado = '', filtroUbicacion = '', busqueda = ''
   if (busqueda) {
     const q = busqueda.toLowerCase();
     tvs = tvs.filter(t =>
-      [t.codigo, t.ubicacion, t.marca, t.modelo, t.serial]
+      [t.codigo, t.ubicacion, t.habitacion, t.marca, t.modelo, t.serial]
         .some(v => v && v.toLowerCase().includes(q))
     );
   }
@@ -1429,6 +1429,11 @@ function seleccionarReemplazo(destino) {
   btn.style.borderColor = 'var(--accent)';
   window._reemplazoSeleccion = destino;
   document.getElementById('reemplazoOtroGroup').style.display = destino === 'Otro' ? '' : 'none';
+  const grpTaller = document.getElementById('reemplazoTallerEstadoGroup');
+  if (grpTaller) {
+    grpTaller.style.display = destino === 'Taller' ? '' : 'none';
+    if (destino === 'Taller') document.getElementById('reemplazoTallerEstado').value = 'inoperativo';
+  }
 }
 
 function confirmarReemplazo() {
@@ -1441,6 +1446,9 @@ function confirmarReemplazo() {
   closeModal('modalReemplazo');
   if (window._tvReemplazoData) {
     window._tvReemplazo = { ...window._tvReemplazoData, destino };
+    if (destino === 'Taller') {
+      window._tvReemplazo.tallerEstado = document.getElementById('reemplazoTallerEstado').value || 'inoperativo';
+    }
   }
   if (window._resolveReemplazo) {
     window._resolveReemplazo(destino);
@@ -1937,9 +1945,10 @@ function populateMovTV() {
       lista = lista.filter(t => t.ubicacion === lugar);
     }
     sel.innerHTML = '<option value="">-- Seleccionar TV --</option>' +
-      lista.map(t =>
-        `<option value="${t.id}" data-codigo="${t.codigo}" data-marca="${t.marca}" data-modelo="${t.modelo || ''}" data-serial="${t.serial}" data-ubi="${t.ubicacion === 'Habitacion' ? ('Hab. ' + (t.habitacion || '?')) : (t.ubicacion || '—')}">[${t.codigo}] ${t.marca} ${t.modelo || ''} · S/N: ${t.serial}</option>`
-      ).join('');
+      lista.map(t => {
+        const ubiTxt = t.ubicacion === 'Habitacion' ? ('Hab. ' + (t.habitacion || '?')) : (t.ubicacion || '—');
+        return `<option value="${t.id}" data-codigo="${t.codigo}" data-marca="${t.marca}" data-modelo="${t.modelo || ''}" data-serial="${t.serial}" data-ubi="${ubiTxt}">[${t.codigo}] ${t.marca} ${t.modelo || ''} · ${ubiTxt} · S/N: ${t.serial}</option>`;
+      }).join('');
       
     window.movTVTomSelect = new TomSelect("#movTV", {
       create: false,
@@ -2121,7 +2130,6 @@ if (document.getElementById('movTV')) {
 // ── Tarjetas visuales de Tipo de Movimiento ──
 document.querySelectorAll('.mov-tipo-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    if (btn.classList.contains('mov-tv-saliente-btn')) return;
     document.querySelectorAll('.mov-tipo-btn').forEach(b => b.classList.remove('selected'));
     btn.classList.add('selected');
     const sel = document.getElementById('movTipo');
@@ -2170,9 +2178,6 @@ document.querySelectorAll('.mov-tipo-btn').forEach(btn => {
       if (btn.dataset.val === 'traslado_hab') {
         const grp = document.getElementById('grpMovDestinoHab');
         if (grp) grp.style.display = '';
-        document.getElementById('movTvSaliente').value = '';
-        document.getElementById('movTvSalienteOtro').style.display = 'none';
-        document.querySelectorAll('.mov-tv-saliente-btn').forEach(b => b.classList.remove('selected'));
         const habInput = document.getElementById('movDestinoHab');
         if (habInput) habInput.focus();
       } else {
@@ -2184,26 +2189,6 @@ document.querySelectorAll('.mov-tipo-btn').forEach(btn => {
     }, 100);
   });
 });
-
-function selectTvSaliente(val) {
-  document.querySelectorAll('.mov-tv-saliente-btn').forEach(b => b.classList.remove('selected'));
-  const btn = document.querySelector(`.mov-tv-saliente-btn[data-val="${val}"]`);
-  if (btn) btn.classList.add('selected');
-  document.getElementById('movTvSaliente').value = val;
-  const otroInput = document.getElementById('movTvSalienteOtro');
-  const grpMovTaller = document.getElementById('grpMovTallerEstado');
-  if (grpMovTaller) {
-    grpMovTaller.style.display = val === 'taller' ? '' : 'none';
-    if (val === 'taller') document.getElementById('movTallerEstado').value = 'inoperativo';
-  }
-  if (val === 'otro') {
-    otroInput.style.display = '';
-    otroInput.focus();
-  } else {
-    otroInput.style.display = 'none';
-    otroInput.value = '';
-  }
-}
 
 // Navegación con flechas en tarjetas de tipo de movimiento
 document.querySelectorAll('.mov-tipo-btn').forEach((btn, idx, btns) => {
@@ -2290,7 +2275,7 @@ if (elMovDestinoHab) {
       return;
     }
     const tvs = loadTVs();
-    const exist = tvs.find(t => t.estado === 'activo' && t.ubicacion === 'Habitacion' && t.habitacion === habVal);
+    const exist = tvs.find(t => t.estado === 'activo' && (t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') && t.habitacion === habVal);
     
     const currentTvId = document.getElementById('movTV') ? document.getElementById('movTV').value : '';
     if (exist && exist.id !== currentTvId) {
@@ -2308,11 +2293,17 @@ if (elMovDestinoHab) {
       if (!habVal || !isValidRoom(habVal)) return;
       const tvs = loadTVs();
       const currentTvId = document.getElementById('movTV') ? document.getElementById('movTV').value : '';
-      const exist = tvs.find(t => t.estado === 'activo' && t.ubicacion === 'Habitacion' && t.habitacion === habVal);
+      const exist = tvs.find(t => t.estado === 'activo' && (t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') && t.habitacion === habVal);
       if (exist && exist.id !== currentTvId) {
         document.getElementById('reemplazoInfo').textContent = `La habitación ${habVal} ya tiene el TV [${exist.codigo}] ${exist.marca} ${exist.modelo || ''}.`;
         document.getElementById('reemplazoOtroGroup').style.display = 'none';
         document.getElementById('reemplazoOtroInput').value = '';
+        const grpTallerEstado = document.getElementById('reemplazoTallerEstadoGroup');
+        if (grpTallerEstado) {
+          grpTallerEstado.style.display = 'none';
+          document.getElementById('reemplazoTallerEstado').value = 'inoperativo';
+        }
+        window._reemplazoSeleccion = null;
         document.querySelectorAll('#modalReemplazo .btn').forEach(b => b.style.borderColor = '');
         window._tvReemplazoData = { id: exist.id, codigo: exist.codigo, marca: exist.marca, modelo: exist.modelo || '', tamano: exist.tamano || '', serial: exist.serial, ubicacion: exist.ubicacion, habitacion: exist.habitacion || '' };
         window._resolveReemplazo = null;
@@ -2456,7 +2447,7 @@ function imprimirActaActual() {
     En esta misma fecha, siendo las <u>&nbsp;${horaFmt}&nbsp;</u>, por instrucciones de la Gerencia General, se procede a realizar el siguiente movimiento de activo en el HPA.
     <br><br>
     <strong>Descripción del procedimiento:</strong><br>
-      ${textoProcedimientoActivo({ tipo: selTipo, origen, destino, tvSaliente: get('movTvSaliente') === 'otro' ? get('movTvSalienteOtro') : get('movTvSaliente'), tvReemplazo: window._tvReemplazo || null }, tv)}<br>
+      ${textoProcedimientoActivo({ tipo: selTipo, origen, destino, tvReemplazo: window._tvReemplazo || null }, tv)}<br>
     <strong>Motivo del movimiento:</strong> ${motivo}<br>
     <strong>Responsable de la ejecución:</strong> ${respList.length ? respList.join(', ') : '______________________'}
   </div>
@@ -2801,9 +2792,6 @@ function resetFormMovimiento() {
   if (grp) grp.style.display = 'none';
   const aviso = document.getElementById('movDestinoHabAviso');
   if (aviso) aviso.style.display = 'none';
-  document.getElementById('movTvSaliente').value = '';
-  document.getElementById('movTvSalienteOtro').style.display = 'none';
-  document.querySelectorAll('.mov-tv-saliente-btn').forEach(b => b.classList.remove('selected'));
   document.querySelectorAll('.mov-tipo-btn').forEach(b => b.classList.remove('selected'));
   _movUpdateTVCard(null);
 
@@ -2852,20 +2840,10 @@ document.getElementById('formMovimiento').addEventListener('submit', async e => 
     if (!habDestino) {
       showToast('Ingresa el número de habitación destino.', 'error'); return;
     }
-    const tvSaliente = get('movTvSaliente');
-    if (!tvSaliente) {
-      showToast('Selecciona el destino del TV saliente.', 'error'); return;
-    }
-    if (tvSaliente === 'otro') {
-      const tvSalienteOtro = get('movTvSalienteOtro');
-      if (!tvSalienteOtro) {
-        showToast('Especifica el destino del TV saliente.', 'error'); return;
-      }
-    }
     if (!isValidRoom(habDestino)) {
       showToast(`La habitación ${habDestino} no es válida.`, 'error'); return;
     }
-    const exist = tvs.find(t => t.estado === 'activo' && t.ubicacion === 'Habitacion' && t.habitacion === habDestino);
+    const exist = tvs.find(t => t.estado === 'activo' && (t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') && t.habitacion === habDestino);
     if (exist && exist.id !== tvId) {
       if (!window._tvReemplazo || window._tvReemplazo.id !== exist.id) {
         showToast('Presiona Enter en el campo de habitación para indicar el destino del TV existente.', 'error'); return;
@@ -2897,13 +2875,10 @@ document.getElementById('formMovimiento').addEventListener('submit', async e => 
   btnSubmit.disabled = true;
 
   try {
-    const tvSalienteVal = get('movTvSaliente');
-    const tvSalienteOtroVal = get('movTvSalienteOtro');
-    const destinoTvSaliente = tvSalienteVal === 'otro' ? tvSalienteOtroVal : tvSalienteVal;
     const mov = {
       id: uid(), tvId, tipo, fecha, responsable, motivo, origen, destino, habDestino,
       tvReemplazo: window._tvReemplazo || null,
-      tvSaliente: destinoTvSaliente || '',
+      tvSaliente: (window._tvReemplazo && window._tvReemplazo.destino) || '',
       creadoEn: new Date().toISOString()
     };
     await db.collection('movimientos').doc(mov.id).set(mov);
@@ -2919,7 +2894,7 @@ document.getElementById('formMovimiento').addEventListener('submit', async e => 
         reempUpdates.ubicacion = reemp.destino;
         if (reemp.destino.toLowerCase().includes('taller')) {
           reempUpdates.estado = 'taller';
-          reempUpdates.tallerEstado = document.getElementById('movTallerEstado').value || 'inoperativo';
+          reempUpdates.tallerEstado = reemp.tallerEstado || 'inoperativo';
         } else if (reemp.destino.toLowerCase().includes('baja')) {
           reempUpdates.estado = 'baja';
         } else if (reemp.destino.toLowerCase().includes('almacén') || reemp.destino.toLowerCase() === 'almacen') {
@@ -3177,7 +3152,7 @@ document.getElementById('btnConfirmAsignar').addEventListener('click', async () 
   if (!hab) { showToast('Ingresa el número de habitación.', 'error'); return; }
 
   const tvsExistCheck = loadTVs();
-  const tvEnHabitacion = tvsExistCheck.find(t => t.habitacion === hab && t.ubicacion === 'Habitacion' && String(t.id) !== String(_asignarTvId));
+  const tvEnHabitacion = tvsExistCheck.find(t => t.habitacion === hab && (t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') && String(t.id) !== String(_asignarTvId));
   if (tvEnHabitacion) {
     showToast(`La habitación ${hab} ya tiene el TV [${tvEnHabitacion.codigo}] ${tvEnHabitacion.marca} ${tvEnHabitacion.modelo}.`, 'error');
     return;
