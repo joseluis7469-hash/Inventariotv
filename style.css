@@ -617,7 +617,7 @@ textarea { resize: vertical; min-height: 80px; }
 .mov-field-label {
   font-size: 0.9rem;
   font-weight: 700;
-  color: #000000;
+  color: #ffffff;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -750,7 +750,7 @@ textarea { resize: vertical; min-height: 80px; }
 .mov-section-label {
   font-size: 0.9rem;
   font-weight: 700;
-  color: #000000;
+  color: #ffffff;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
