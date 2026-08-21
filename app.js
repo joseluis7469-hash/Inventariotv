@@ -385,20 +385,11 @@ document.addEventListener('keydown', e => {
 });
 
 // ─── BÚSQUEDA INVENTARIO ─────────────────────────────────────────
-// El campo de búsqueda se limpia automáticamente al navegar a la página de inventario
-// o al resetear el formulario, pero NO se limpia al hacer clic fuera (para permitir
-// la entrada de caracteres sin interrupciones).
+// El campo de búsqueda mantiene el texto mientras escribe.
+// Los filtros se aplican automáticamente cada vez que se escribe un carácter.
+// El campo se limpia al presionar Escape (mientras tiene foco) o al navegar a la página de Inventario.
+
 document.getElementById('searchInventario').addEventListener('input', applyInventarioFilters);
-// El campo se limpia al presionar Escape solo si estaba enfocado en él
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') {
-    const searchInput = document.getElementById('searchInventario');
-    if (searchInput && document.activeElement === searchInput) {
-      searchInput.value = '';
-      applyInventarioFilters();
-    }
-  }
-});
 
 // ─── DASHBOARD ───────────────────────────────────────────────
 function renderDashboard() {
