@@ -2277,8 +2277,7 @@ if (elMovDestinoHab) {
     const tvs = loadTVs();
     const exist = tvs.find(t => t.estado === 'activo' && (t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') && t.habitacion === habVal);
     
-    const currentTvId = document.getElementById('movTV') ? document.getElementById('movTV').value : '';
-    if (exist && exist.id !== currentTvId) {
+    if (exist) {
       aviso.textContent = `¡Atención! La habitación ${habVal} ya posee el TV: [${exist.codigo}] ${exist.marca}.`;
       aviso.style.display = 'block';
     } else {
@@ -2292,9 +2291,8 @@ if (elMovDestinoHab) {
       const habVal = this.value.trim();
       if (!habVal || !isValidRoom(habVal)) return;
       const tvs = loadTVs();
-      const currentTvId = document.getElementById('movTV') ? document.getElementById('movTV').value : '';
       const exist = tvs.find(t => t.estado === 'activo' && (t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') && t.habitacion === habVal);
-      if (exist && exist.id !== currentTvId) {
+      if (exist) {
         document.getElementById('reemplazoInfo').textContent = `La habitación ${habVal} ya tiene el TV [${exist.codigo}] ${exist.marca} ${exist.modelo || ''}.`;
         document.getElementById('reemplazoOtroGroup').style.display = 'none';
         document.getElementById('reemplazoOtroInput').value = '';
