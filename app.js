@@ -384,14 +384,20 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// Limpiar campo de búsqueda al hacer clic fuera de él (solo si no está siendo navegado)
-document.getElementById('searchInventario').addEventListener('blur', function(e) {
-  // No limpiar si el usuario está navegando con flechas Enter entre campos
-  const camposNavegables = document.querySelectorAll('input, select, textarea');
-  const esCampoNavegable = Array.from(camposNavegables).includes(this);
-  if (esCampoNavegable) return;
-  this.value = '';
-  applyInventarioFilters();
+// ─── BÚSQUEDA INVENTARIO ─────────────────────────────────────────
+// El campo de búsqueda se limpia automáticamente al navegar a la página de inventario
+// o al resetear el formulario, pero NO se limpia al hacer clic fuera (para permitir
+// la entrada de caracteres sin interrupciones).
+document.getElementById('searchInventario').addEventListener('input', applyInventarioFilters);
+// El campo se limpia al presionar Escape solo si estaba enfocado en él
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    const searchInput = document.getElementById('searchInventario');
+    if (searchInput && document.activeElement === searchInput) {
+      searchInput.value = '';
+      applyInventarioFilters();
+    }
+  }
 });
 
 // ─── DASHBOARD ───────────────────────────────────────────────
