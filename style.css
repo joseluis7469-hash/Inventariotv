@@ -3,7 +3,28 @@
    Design System & Styles
    ============================================================ */
 
-/* ---------- CSS VARIABLES ---------- */
+/* Dashboard: Últimos Movimientos y TVs en Taller con scroll de 4 registros */
+.mini-list {
+  max-height: 200px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mini-list::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.mini-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.mini-list::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
 :root {
   --bg-base:       #03091a;
   --bg-surface:    #071428;
@@ -835,6 +856,8 @@ textarea { resize: vertical; min-height: 80px; }
   padding: 0.15rem 0.45rem;
   display: inline-block;
   text-shadow: 0 0 8px rgba(0,245,160,0.4);
+  min-width: 4rem;
+  white-space: nowrap;
 }
 
 .mov-ruta-tag-dest {
@@ -842,6 +865,17 @@ textarea { resize: vertical; min-height: 80px; }
   border-color: rgba(99,179,237,0.3);
   background: var(--accent-glow);
   text-shadow: 0 0 8px rgba(0,212,255,0.4);
+  min-width: 4rem;
+  white-space: nowrap;
+}
+
+.mov-ruta {
+  display: flex;
+  align-items: center;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  gap: 1rem;
+  flex-wrap: nowrap;
 }
 
 .mov-ruta-select { width: 100%; }
