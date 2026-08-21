@@ -2185,6 +2185,15 @@ document.querySelectorAll('.mov-tipo-btn').forEach(btn => {
         }
         document.getElementById('movTallerEstado').value = 'inoperativo';
       }
+      if (btn.dataset.val === 'retorno_taller') {
+        // Establecer origen como "Taller" para retorno de taller
+        const origenSelect = document.getElementById('movOrigen');
+        if (origenSelect) {
+          origenSelect.value = 'Taller';
+          origenSelect.disabled = true;
+        }
+        grpMovTaller.style.display = '';
+      }
     }
 
     const destInput = document.getElementById('movDestino');
