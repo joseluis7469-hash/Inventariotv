@@ -2275,7 +2275,7 @@ if (elMovDestinoHab) {
       return;
     }
     const tvs = loadTVs();
-    const exist = tvs.find(t => t.estado === 'activo' && (t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') && t.habitacion === habVal);
+    const exist = tvs.find(t => t.estado === 'activo' && ((t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') || t.ubicacion === habVal) && (t.habitacion === habVal || t.ubicacion === habVal));
     
     if (exist) {
       aviso.textContent = `¡Atención! La habitación ${habVal} ya posee el TV: [${exist.codigo}] ${exist.marca}.`;
@@ -2291,7 +2291,7 @@ if (elMovDestinoHab) {
       const habVal = this.value.trim();
       if (!habVal || !isValidRoom(habVal)) return;
       const tvs = loadTVs();
-      const exist = tvs.find(t => t.estado === 'activo' && (t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') && t.habitacion === habVal);
+      const exist = tvs.find(t => t.estado === 'activo' && ((t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') || t.ubicacion === habVal) && (t.habitacion === habVal || t.ubicacion === habVal));
       if (exist) {
         document.getElementById('reemplazoInfo').textContent = `La habitación ${habVal} ya tiene el TV [${exist.codigo}] ${exist.marca} ${exist.modelo || ''}.`;
         document.getElementById('reemplazoOtroGroup').style.display = 'none';
@@ -2841,7 +2841,7 @@ document.getElementById('formMovimiento').addEventListener('submit', async e => 
     if (!isValidRoom(habDestino)) {
       showToast(`La habitación ${habDestino} no es válida.`, 'error'); return;
     }
-    const exist = tvs.find(t => t.estado === 'activo' && (t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') && t.habitacion === habDestino);
+    const exist = tvs.find(t => t.estado === 'activo' && ((t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') || t.ubicacion === habDestino) && (t.habitacion === habDestino || t.ubicacion === habDestino));
     if (exist && exist.id !== tvId) {
       if (!window._tvReemplazo || window._tvReemplazo.id !== exist.id) {
         showToast('Presiona Enter en el campo de habitación para indicar el destino del TV existente.', 'error'); return;
