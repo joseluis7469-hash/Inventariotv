@@ -476,6 +476,11 @@ function renderDashboard() {
 
 // ─── INVENTARIO ──────────────────────────────────────────────
 function renderInventario(filtroEstado = '', filtroUbicacion = '', busqueda = '') {
+  // Limpiar siempre el campo de búsqueda al mostrar el inventario
+  const searchInput = document.getElementById('searchInventario');
+  if (searchInput) {
+    searchInput.value = '';
+  }
   let tvs = loadTVs();
 
   if (filtroEstado) tvs = tvs.filter(t => t.estado === filtroEstado);
