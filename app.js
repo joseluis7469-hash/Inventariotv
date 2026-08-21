@@ -2177,6 +2177,12 @@ document.querySelectorAll('.mov-tipo-btn').forEach(btn => {
     if (grpMovTaller) {
       grpMovTaller.style.display = btn.dataset.val === 'entrada_taller' ? '' : 'none';
       if (btn.dataset.val === 'entrada_taller') {
+        // Establecer origen como "Taller" para este tipo de movimiento
+        const origenSelect = document.getElementById('movOrigen');
+        if (origenSelect) {
+          origenSelect.value = 'Taller';
+          origenSelect.disabled = true;
+        }
         document.getElementById('movTallerEstado').value = 'inoperativo';
       }
     }
