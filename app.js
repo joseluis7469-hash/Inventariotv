@@ -2325,7 +2325,12 @@ if (elMovDestinoHab) {
       return;
     }
     const tvs = loadTVs();
-    const exist = tvs.find(t => t.estado === 'activo' && ((t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') || t.ubicacion === habVal) && (t.habitacion === habVal || t.ubicacion === habVal));
+    // Buscar TVs activos en habitación: revisar tanto ubicacion='Habitacion' con habitacion como ubicacion directa
+    const exist = tvs.find(t => 
+      t.estado === 'activo' && 
+      ((t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') && t.habitacion === habVal) || 
+      (t.ubicacion === habVal)
+    );
     
     if (exist) {
       aviso.textContent = `¡Atención! La habitación ${habVal} ya posee el TV: [${exist.codigo}] ${exist.marca}.`;
@@ -2341,7 +2346,11 @@ if (elMovDestinoHab) {
       const habVal = this.value.trim();
       if (!habVal || !isValidRoom(habVal)) return;
       const tvs = loadTVs();
-      const exist = tvs.find(t => t.estado === 'activo' && ((t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') || t.ubicacion === habVal) && (t.habitacion === habVal || t.ubicacion === habVal));
+      // Buscar TVs activos en habitación: revisar tanto ubicacion='Habitacion' con habitacion como ubicacion directa
+      const exist = tvs.find(t => 
+        t.estado === 'activo' && 
+        ((t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') && t.habitacion === habVal) || 
+        (t.ubicacion === habVal));
       if (exist) {
         document.getElementById('reemplazoInfo').textContent = `La habitación ${habVal} ya tiene el TV [${exist.codigo}] ${exist.marca} ${exist.modelo || ''}.`;
         document.getElementById('reemplazoOtroGroup').style.display = 'none';
