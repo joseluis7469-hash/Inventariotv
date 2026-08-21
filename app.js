@@ -2827,6 +2827,13 @@ function resetFormMovimiento() {
 
   document.querySelectorAll('.mov-resp-input').forEach(i => i.value = '');
 
+  // Limpiar también el campo de búsqueda global al resetear el formulario de movimiento
+  const searchInput = document.getElementById('searchInventario');
+  if (searchInput) {
+    searchInput.value = '';
+    applyInventarioFilters();
+  }
+
   adjustMovDestinoHabWidth();
 }
 
