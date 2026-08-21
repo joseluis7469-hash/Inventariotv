@@ -1423,10 +1423,10 @@ function getRoomsForArea(area) {
   return rooms;
 }
 
-function seleccionarReemplazo(destino) {
+function seleccionarReemplazo(destino, event) {
   document.querySelectorAll('#modalReemplazo .btn').forEach(b => b.style.borderColor = '');
-  const btn = event.currentTarget;
-  btn.style.borderColor = 'var(--accent)';
+  const btn = event ? event.currentTarget : document.querySelector(`#modalReemplazo .btn[onclick*="'${destino}'"]`);
+  if (btn) btn.style.borderColor = 'var(--accent)';
   window._reemplazoSeleccion = destino;
   document.getElementById('reemplazoOtroGroup').style.display = destino === 'Otro' ? '' : 'none';
   const grpTaller = document.getElementById('reemplazoTallerEstadoGroup');
@@ -3653,7 +3653,7 @@ function camposNavegablesDelScope(scope) {
     if (el.disabled || el.readOnly) return false;
     if (el.hidden || el.style.display === 'none') return false;
     if (el.closest('.ts-wrapper')) return false;
-    if (el.id === 'searchInventario' || el.id === 'searchHistorial') return false;
+    if (el.id === 'searchInventario' || el.id === 'searchHistorial' || el.id === 'movDestinoHab') return false;
     if (el.tagName === 'INPUT') {
       const type = (el.getAttribute('type') || 'text').toLowerCase();
       if (['hidden','button','submit','reset','file','checkbox','radio','image','color'].includes(type)) return false;

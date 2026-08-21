@@ -911,19 +911,19 @@
         </div>
         <p class="reloc-question">¿A dónde se reubica este TV?</p>
         <div class="reloc-grid">
-          <button class="reloc-card reloc-taller" onclick="seleccionarReemplazo('Taller')">
+          <button class="reloc-card reloc-taller" onclick="seleccionarReemplazo('Taller', event)">
             <span class="reloc-icon">🔧</span>
             <div class="reloc-label"><strong>Taller</strong><br><small>Envío a reparación</small></div>
           </button>
-          <button class="reloc-card reloc-almacen" onclick="seleccionarReemplazo('Almacén')">
+          <button class="reloc-card reloc-almacen" onclick="seleccionarReemplazo('Almacén', event)">
             <span class="reloc-icon">📦</span>
             <div class="reloc-label"><strong>Almacén</strong><br><small>Guardado en inventario</small></div>
           </button>
-          <button class="reloc-card reloc-baja" onclick="seleccionarReemplazo('Baja')">
+          <button class="reloc-card reloc-baja" onclick="seleccionarReemplazo('Baja', event)">
             <span class="reloc-icon">❌</span>
             <div class="reloc-label"><strong>Dado de Baja</strong><br><small>Retiro del servicio</small></div>
           </button>
-          <button class="reloc-card reloc-otro" onclick="seleccionarReemplazo('Otro')">
+          <button class="reloc-card reloc-otro" onclick="seleccionarReemplazo('Otro', event)">
             <span class="reloc-icon">📝</span>
             <div class="reloc-label"><strong>Otro</strong><br><small>Especificar destino</small></div>
           </button>
