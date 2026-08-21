@@ -2174,10 +2174,24 @@ document.querySelectorAll('.mov-tipo-btn').forEach(btn => {
     if (grpMovTaller) {
       grpMovTaller.style.display = btn.dataset.val === 'entrada_taller' ? '' : 'none';
       if (btn.dataset.val === 'entrada_taller') {
-        // Establecer origen como "Taller" para este tipo de movimiento
+        // Establecer origen según la ubicación actual del TV
         const origenSelect = document.getElementById('movOrigen');
-        if (origenSelect) {
-          origenSelect.value = 'Taller';
+        const tvSelect = document.getElementById('movTV');
+        if (origenSelect && tvSelect) {
+          const tv = tvs.find(t => String(t.id) === String(tvSelect.value));
+          if (tv) {
+            // Si el TV está en habitación, poner el número de habitación
+            if (tv.ubicacion === 'Habitacion' && tv.habitacion) {
+              origenSelect.value = tv.habitacion;
+            } else if (tv.ubicacion === 'Taller') {
+              origenSelect.value = 'Taller';
+            } else {
+              // Otherwise, use the location
+              origenSelect.value = tv.ubicacion || '';
+            }
+          } else {
+            origenSelect.value = '';
+          }
           origenSelect.disabled = true;
         }
         document.getElementById('movTallerEstado').value = 'inoperativo';
