@@ -342,14 +342,21 @@ document.querySelectorAll('.modal-overlay').forEach(o => {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     const searchInput = document.getElementById('searchInventario');
+    // Si el usuario está escribiendo en el campo de búsqueda, limpiarlo
     if (searchInput && document.activeElement === searchInput) {
       searchInput.value = '';
       searchInput.blur();
       applyInventarioFilters();
       return;
     }
+    // Si hay modales abiertos, cerrarlos y limpiar el campo de búsqueda
     const openModals = document.querySelectorAll('.modal-overlay.open');
     if (openModals.length) {
+      // Limpiar campo de búsqueda al cerrar cualquier modal
+      if (searchInput) {
+        searchInput.value = '';
+        applyInventarioFilters();
+      }
       const last = openModals[openModals.length - 1];
       last.classList.remove('open');
       if (last.id === 'modalZoom') {
@@ -357,8 +364,25 @@ document.addEventListener('keydown', e => {
         if (img) { img.style.transition = 'transform 0.3s'; img.style.transform = 'scale(0.95)'; }
       }
       if (_lastFocusedElement) { _lastFocusedElement.focus(); _lastFocusedElement = null; }
+    } else {
+      // Si no hay modales abiertos pero el usuario sale de la búsqueda avanzada,
+      // asegurar que el campo esté limpio
+      if (searchInput) {
+        searchInput.value = '';
+        applyInventarioFilters();
+      }
     }
   }
+});
+
+// Limpiar campo de búsqueda al hacer clic fuera de él (solo si no está siendo navegado)
+document.getElementById('searchInventario').addEventListener('blur', function(e) {
+  // No limpiar si el usuario está navegando con flechas Enter entre campos
+  const camposNavegables = document.querySelectorAll('input, select, textarea');
+  const esCampoNavegable = Array.from(camposNavegables).includes(this);
+  if (esCampoNavegable) return;
+  this.value = '';
+  applyInventarioFilters();
 });
 
 // ─── DASHBOARD ───────────────────────────────────────────────
