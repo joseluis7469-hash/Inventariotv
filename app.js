@@ -63,6 +63,15 @@ function showPage(id) {
     adminInvTools.style.display = hasPermission('eliminar_base_datos') ? 'flex' : 'none';
   }
 
+  // Limpiar campo de búsqueda al mostrar la página de inventario
+  if (id === 'inventario') {
+    const searchInput = document.getElementById('searchInventario');
+    if (searchInput) {
+      searchInput.value = '';
+      applyInventarioFilters();
+    }
+  }
+
   if (id === 'dashboard')   renderDashboard();
   if (id === 'inventario')  renderInventario();
   if (id === 'historial')   renderHistorial();
