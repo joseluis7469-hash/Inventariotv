@@ -2158,8 +2158,13 @@ if (document.getElementById('movTV')) {
 // ── Tarjetas visuales de Tipo de Movimiento ──
 document.querySelectorAll('.mov-tipo-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.mov-tipo-btn').forEach(b => b.classList.remove('selected'));
+    if (btn.classList.contains('locked')) return;
+    document.querySelectorAll('.mov-tipo-btn').forEach(b => {
+      b.classList.remove('selected');
+      b.classList.remove('locked');
+    });
     btn.classList.add('selected');
+    btn.classList.add('locked');
     const sel = document.getElementById('movTipo');
     if (sel) sel.value = btn.dataset.val;
 

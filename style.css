@@ -834,6 +834,13 @@ textarea { resize: vertical; min-height: 80px; }
   box-shadow: 0 0 0 2px rgba(99,179,237,0.25);
 }
 
+.mov-tipo-btn.locked {
+  border-color: var(--accent);
+  background: linear-gradient(135deg, var(--accent-glow), rgba(99,179,237,0.08));
+  box-shadow: 0 0 0 2px rgba(99,179,237,0.25);
+  cursor: default;
+}
+
 .mov-tipo-ico { font-size: 1.3rem; line-height: 1; }
 
 .mov-tipo-txt {
