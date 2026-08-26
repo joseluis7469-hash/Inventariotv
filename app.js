@@ -2025,7 +2025,7 @@ function populateMovTV() {
       <option value="">-- Seleccionar --</option>
       <option value="traslado_hab">HABITACION</option>
       <option value="entrada_taller">TALLER</option>
-      <option value="retorno_taller">SALIDA DEL TALLER</option>
+      <option value="reingreso">SALIDA DEL TALLER</option>
       <option value="baja">DE BAJA</option>
       <option value="otro">OTROS</option>
     `;
@@ -2202,15 +2202,6 @@ if (btn.dataset.val === 'entrada_taller') {
       }
       document.getElementById('movTallerEstado').value = 'inoperativo';
     }
-      if (btn.dataset.val === 'retorno_taller') {
-        // Establecer origen como "Taller" para retorno de taller
-        const origenSelect = document.getElementById('movOrigen');
-        if (origenSelect) {
-          origenSelect.value = 'Taller';
-          origenSelect.disabled = true;
-        }
-        grpMovTaller.style.display = '';
-      }
       if (btn.dataset.val === 'reingreso') {
         const origenSelect = document.getElementById('movOrigen');
         if (origenSelect) {
@@ -2523,7 +2514,7 @@ function textoProcedimientoActivo(mov, tv) {
       <strong>Procedimiento de Baja de Activo:</strong> Se procede a dar de baja el televisor del inventario activo del HPA, quedando excluido del parque tecnológico. Se registran las razones de la baja y se deja constancia del retiro del equipo del servicio.`;
     case 'reingreso':
       return `${base}<br>
-      <strong>Procedimiento de Reingreso de Activo:</strong> El televisor, previamente dado de baja, es reintegrado al inventario activo del HPA tras verificarse las condiciones que motivan su reingreso. Queda registrado nuevamente como activo disponible.`;
+      <strong>Procedimiento de Salida del Taller:</strong> El televisor fue recibido del Taller de Reparaciones del HPA una vez concluida su reparación y verificación técnica. Se procede a reasignarlo a la ubicación de destino (${destino}), quedando nuevamente disponible y operativo en el inventario activo del hotel.`;
     case 'traslado_hab':
       return `${base}<br>
       <strong>Procedimiento de Traslado de Activo:</strong> Se retira el televisor de su ubicación de origen (${origen}) y se traslada a la habitación ${destino}. El equipo es instalado y verificado en la habitación designada, quedando en servicio.${mov.tvReemplazo ? `<br>
@@ -2564,6 +2555,14 @@ function imprimirActaActual() {
   if (selTipo === 'traslado_hab') {
     const hab = get('movDestinoHab');
     destino = hab ? `Hab. ${hab}` : destino;
+  }
+  if (selTipo === 'reingreso') {
+    const destSelEl = document.getElementById('movDestinoSelect');
+    if (destSelEl && destSelEl.style.display !== 'none') {
+      destino = get('movDestinoSelect') || destino;
+    } else {
+      destino = get('movDestino') || destino;
+    }
   }
 
   const motivo = get('movMotivo') || 'Sin descripción';
@@ -3032,12 +3031,6 @@ document.getElementById('formMovimiento').addEventListener('submit', async e => 
     }
   }
 
-  if (tipo === 'retorno_taller') {
-      // For retorno_taller, we also ask for destination but it's just 'Destino' or 'Habitación' if applicable.
-      // Wait, in retorno_taller, movDestino is "Retorno de Taller", it doesn't show hab input by default in UI.
-      // So no need to check habDestino for retorno_taller if it's not provided.
-  }
-
   if (tipo === 'reingreso') {
     const destSelectEl = document.getElementById('movDestinoSelect');
     const destInputEl = document.getElementById('movDestino');
@@ -3125,7 +3118,6 @@ document.getElementById('formMovimiento').addEventListener('submit', async e => 
     if (tv) {
       const updates = {};
       if (tipo === 'entrada_taller')  { updates.estado = 'taller'; updates.tallerEstado = document.getElementById('movTallerEstado').value || 'inoperativo'; updates.ubicacion = 'Taller'; updates.habitacion = ''; updates.piso = ''; }
-      if (tipo === 'retorno_taller')  { updates.estado = 'activo'; updates.tallerEstado = ''; if (mov.habDestino) { updates.ubicacion = 'Habitacion'; updates.habitacion = mov.habDestino; if (mov.pisoDestino || tv.piso) updates.piso = mov.pisoDestino || tv.piso; } }
       if (tipo === 'baja')            updates.estado = 'baja';
       if (tipo === 'reingreso')       {
         updates.estado = 'activo';
