@@ -2243,7 +2243,11 @@ if (btn.dataset.val === 'entrada_taller') {
         }
       }
     } else if (btn.dataset.val === 'reingreso') {
-      if (destInput) destInput.style.display = 'none';
+      if (destInput) {
+        destInput.style.display = '';
+        destInput.value = '';
+        destInput.readOnly = true;
+      }
       if (destSelect) {
         destSelect.style.display = '';
         renderMovDestinoSelect();
@@ -2342,6 +2346,8 @@ if (document.getElementById('movDestinoSelect')) {
       grp.style.display = '';
       const habInput = document.getElementById('movDestinoHab');
       const habList = document.getElementById('movDestinoHabList');
+      const movDestino = document.getElementById('movDestino');
+      if (movDestino) movDestino.value = this.value || '';
       if (habInput && habList) {
         const rooms = getRoomsForArea(this.value);
         habList.innerHTML = rooms.map(r => `<option value="${r}">`).join('');
@@ -2349,6 +2355,14 @@ if (document.getElementById('movDestinoSelect')) {
         habInput.disabled = false;
         habInput.focus();
       }
+    } else if (selTipo && selTipo.value === 'reingreso') {
+      grp.style.display = 'none';
+      const movDestino = document.getElementById('movDestino');
+      if (movDestino) movDestino.value = this.value || '';
+      const habInput = document.getElementById('movDestinoHab');
+      if (habInput) { habInput.value = ''; habInput.disabled = false; }
+      const aviso = document.getElementById('movDestinoHabAviso');
+      if (aviso) aviso.style.display = 'none';
     } else if (selTipo && selTipo.value === 'traslado_hab') {
       grp.style.display = '';
     } else {
@@ -2395,7 +2409,6 @@ if (elMovDestinoHab) {
       return;
     }
     const tvs = loadTVs();
-    // Buscar TVs activos en habitación: revisar tanto ubicacion='Habitacion' con habitacion como ubicacion directa
     const exist = tvs.find(t => 
       t.estado === 'activo' && 
       ((t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') && t.habitacion === habVal) || 
@@ -2407,6 +2420,20 @@ if (elMovDestinoHab) {
       aviso.style.display = 'none';
     } else {
       aviso.style.display = 'none';
+      const selTipo = document.getElementById('movTipo');
+      const destSelect = document.getElementById('movDestinoSelect');
+      if (selTipo && selTipo.value === 'reingreso' && destSelect) {
+        const area = destSelect.value;
+        destSelect.value = area;
+        const movDestino = document.getElementById('movDestino');
+        if (movDestino) movDestino.value = area ? `${area} - Hab. ${habVal}` : '';
+      } else if (selTipo && selTipo.value === 'traslado_hab') {
+        const movDestino = document.getElementById('movDestino');
+        if (movDestino) movDestino.value = `Hab. ${habVal}`;
+      }
+      const nextField = document.getElementById('movFecha');
+      if (nextField) nextField.focus();
+    }
     }
   });
 
