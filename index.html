@@ -341,7 +341,13 @@
               </button>
             </div>
             <!-- Select oculto para mantener compatibilidad con el JS existente -->
-            <select id="movTipo" required style="display:none;"></select>
+            <select id="movTipo" required style="display:none;">
+              <option value="traslado_hab">Traslado Habitación</option>
+              <option value="entrada_taller">Envío a Taller</option>
+              <option value="baja">Dar de Baja</option>
+              <option value="reingreso">Salida del Taller</option>
+              <option value="otro">Otro</option>
+            </select>
           </div>
 
           <!-- Sección: Flujo Origen → Destino -->
