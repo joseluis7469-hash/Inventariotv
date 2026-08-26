@@ -3039,7 +3039,13 @@ document.getElementById('formMovimiento').addEventListener('submit', async e => 
   }
 
   if (tipo === 'reingreso') {
-    destino = get('movDestinoSelect');
+    const destSelectEl = document.getElementById('movDestinoSelect');
+    const destInputEl = document.getElementById('movDestino');
+    if (destSelectEl && destSelectEl.style.display !== 'none') {
+      destino = get('movDestinoSelect');
+    } else if (destInputEl) {
+      destino = get('movDestino');
+    }
     if (!destino) {
       showToast('Selecciona el área de destino.', 'error'); return;
     }
@@ -3079,7 +3085,8 @@ document.getElementById('formMovimiento').addEventListener('submit', async e => 
   try {
     let pisoDestino = '';
     if (tipo === 'reingreso' && habDestino) {
-      pisoDestino = get('movDestinoSelect') || '';
+      const destSelEl = document.getElementById('movDestinoSelect');
+      pisoDestino = (destSelEl && destSelEl.style.display !== 'none') ? get('movDestinoSelect') : (destino.split(' - ')[0] || '');
     } else if (tipo === 'traslado_hab' && habDestino) {
       pisoDestino = get('movDestinoSelect') || get('asignarArea') || '';
     }

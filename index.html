@@ -1040,6 +1040,11 @@
     <div style="position: absolute; top: 1.5rem; right: 1.5rem; display: flex; gap: 0.5rem;">
       <button class="modal-close" onclick="closeModal('modalZoom')" style="background: rgba(255,255,255,0.1); color: #fff; width: 40px; height: 40px; border-radius: 50%; font-size: 1.5rem; transition: var(--transition);">✕</button>
     </div>
+    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; padding: 2rem;" onclick="closeModal('modalZoom')">
+      <img id="zoomImgSource" src="" tabindex="0" style="max-width: 90%; max-height: 80vh; object-fit: contain; border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.1); margin-bottom: 1rem; transform: scale(0.95); transition: transform 0.3s cubic-bezier(.4,0,.2,1);" onclick="event.stopPropagation()" />
+      <h4 id="zoomImgTitle" style="color: #fff; font-size: 1rem; font-weight: 600; text-shadow: 0 2px 4px rgba(0,0,0,0.5); font-family: 'Inter', sans-serif;">—</h4>
+    </div>
+  </div>
 
   <!-- MODAL: ALERTA HABITACION CON TV -->
   <div class="modal-overlay" id="modalAlertaHab">
@@ -1067,11 +1072,6 @@
         <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.2rem;">Por favor seleccione otra habitación.</p>
         <button onclick="closeModal('modalAlertaHab')" style="width: 100%; padding: 0.7rem; background: linear-gradient(135deg, #ff4d6d, #ff6b81); color: #fff; border: none; border-radius: var(--radius-sm); font-weight: 600; cursor: pointer; font-size: 0.9rem;">Entendido</button>
       </div>
-    </div>
-  </div>
-    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; padding: 2rem;" onclick="closeModal('modalZoom')">
-      <img id="zoomImgSource" src="" tabindex="0" style="max-width: 90%; max-height: 80vh; object-fit: contain; border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.1); margin-bottom: 1rem; transform: scale(0.95); transition: transform 0.3s cubic-bezier(.4,0,.2,1);" onclick="event.stopPropagation()" />
-      <h4 id="zoomImgTitle" style="color: #fff; font-size: 1rem; font-weight: 600; text-shadow: 0 2px 4px rgba(0,0,0,0.5); font-family: 'Inter', sans-serif;">—</h4>
     </div>
   </div>
 
