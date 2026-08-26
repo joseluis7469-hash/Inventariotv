@@ -2243,11 +2243,7 @@ if (btn.dataset.val === 'entrada_taller') {
         }
       }
     } else if (btn.dataset.val === 'reingreso') {
-      if (destInput) {
-        destInput.style.display = '';
-        destInput.value = '';
-        destInput.readOnly = true;
-      }
+      if (destInput) destInput.style.display = 'none';
       if (destSelect) {
         destSelect.style.display = '';
         renderMovDestinoSelect();
@@ -2346,8 +2342,6 @@ if (document.getElementById('movDestinoSelect')) {
       grp.style.display = '';
       const habInput = document.getElementById('movDestinoHab');
       const habList = document.getElementById('movDestinoHabList');
-      const movDestino = document.getElementById('movDestino');
-      if (movDestino) movDestino.value = this.value || '';
       if (habInput && habList) {
         const rooms = getRoomsForArea(this.value);
         habList.innerHTML = rooms.map(r => `<option value="${r}">`).join('');
@@ -2358,11 +2352,19 @@ if (document.getElementById('movDestinoSelect')) {
     } else if (selTipo && selTipo.value === 'reingreso') {
       grp.style.display = 'none';
       const movDestino = document.getElementById('movDestino');
-      if (movDestino) movDestino.value = this.value || '';
+      const destSelect = document.getElementById('movDestinoSelect');
+      if (destSelect) destSelect.style.display = 'none';
+      if (movDestino) {
+        movDestino.style.display = '';
+        movDestino.value = this.value || '';
+        movDestino.readOnly = true;
+      }
       const habInput = document.getElementById('movDestinoHab');
       if (habInput) { habInput.value = ''; habInput.disabled = false; }
       const aviso = document.getElementById('movDestinoHabAviso');
       if (aviso) aviso.style.display = 'none';
+      const nextField = document.getElementById('movFecha');
+      if (nextField) nextField.focus();
     } else if (selTipo && selTipo.value === 'traslado_hab') {
       grp.style.display = '';
     } else {
@@ -2418,17 +2420,34 @@ if (elMovDestinoHab) {
     if (exist) {
       showAlertaHabitacion(habVal, exist);
       aviso.style.display = 'none';
+      const selTipo = document.getElementById('movTipo');
+      if (selTipo && selTipo.value === 'reingreso') {
+        const destSelect = document.getElementById('movDestinoSelect');
+        const movDestino = document.getElementById('movDestino');
+        const area = destSelect ? destSelect.value : '';
+        if (destSelect) destSelect.style.display = 'none';
+        if (movDestino) {
+          movDestino.style.display = '';
+          movDestino.value = area ? `${area} - Hab. ${habVal}` : '';
+          movDestino.readOnly = true;
+        }
+      }
+      const nextField = document.getElementById('movFecha');
+      if (nextField) nextField.focus();
     } else {
       aviso.style.display = 'none';
       const selTipo = document.getElementById('movTipo');
       const destSelect = document.getElementById('movDestinoSelect');
+      const movDestino = document.getElementById('movDestino');
       if (selTipo && selTipo.value === 'reingreso' && destSelect) {
         const area = destSelect.value;
-        destSelect.value = area;
-        const movDestino = document.getElementById('movDestino');
-        if (movDestino) movDestino.value = area ? `${area} - Hab. ${habVal}` : '';
+        if (destSelect) destSelect.style.display = 'none';
+        if (movDestino) {
+          movDestino.style.display = '';
+          movDestino.value = area ? `${area} - Hab. ${habVal}` : '';
+          movDestino.readOnly = true;
+        }
       } else if (selTipo && selTipo.value === 'traslado_hab') {
-        const movDestino = document.getElementById('movDestino');
         if (movDestino) movDestino.value = `Hab. ${habVal}`;
       }
       const nextField = document.getElementById('movFecha');
