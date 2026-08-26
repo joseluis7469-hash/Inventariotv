@@ -2434,7 +2434,6 @@ if (elMovDestinoHab) {
       const nextField = document.getElementById('movFecha');
       if (nextField) nextField.focus();
     }
-    }
   });
 
   elMovDestinoHab.addEventListener('keydown', function(e) {
