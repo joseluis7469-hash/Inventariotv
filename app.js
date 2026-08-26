@@ -2198,6 +2198,18 @@ if (btn.dataset.val === 'entrada_taller') {
         }
         grpMovTaller.style.display = '';
       }
+      if (btn.dataset.val === 'reingreso') {
+        const origenSelect = document.getElementById('movOrigen');
+        if (origenSelect) {
+          origenSelect.value = 'Taller';
+          origenSelect.disabled = true;
+        }
+        destInput.style.display = 'none';
+        destSelect.style.display = '';
+        renderMovDestinoSelect();
+        destSelect.value = '';
+        setTimeout(() => destSelect.focus(), 100);
+      }
     }
 
     const destInput = document.getElementById('movDestino');
@@ -2306,6 +2318,29 @@ if (document.getElementById('movDestinoSelect')) {
       } else {
         this.value = '';
       }
+    }
+    const selTipo = document.getElementById('movTipo');
+    const grp = document.getElementById('grpMovDestinoHab');
+    const val = (this.value || '').toLowerCase();
+    if (selTipo && selTipo.value === 'reingreso' && (val.includes('premium') || val.includes('anillo'))) {
+      grp.style.display = '';
+      const habInput = document.getElementById('movDestinoHab');
+      const habList = document.getElementById('movDestinoHabList');
+      if (habInput && habList) {
+        const rooms = getRoomsForArea(this.value);
+        habList.innerHTML = rooms.map(r => `<option value="${r}">`).join('');
+        habInput.value = '';
+        habInput.disabled = false;
+        habInput.focus();
+      }
+    } else if (selTipo && selTipo.value === 'traslado_hab') {
+      grp.style.display = '';
+    } else {
+      grp.style.display = 'none';
+      const habInput = document.getElementById('movDestinoHab');
+      if (habInput) { habInput.value = ''; habInput.disabled = false; }
+      const aviso = document.getElementById('movDestinoHabAviso');
+      if (aviso) aviso.style.display = 'none';
     }
   });
 }
@@ -2942,6 +2977,28 @@ document.getElementById('formMovimiento').addEventListener('submit', async e => 
       // So no need to check habDestino for retorno_taller if it's not provided.
   }
 
+  if (tipo === 'reingreso') {
+    destino = get('movDestinoSelect');
+    if (!destino) {
+      showToast('Selecciona el área de destino.', 'error'); return;
+    }
+    const valArea = (destino || '').toLowerCase();
+    if (valArea.includes('premium') || valArea.includes('anillo')) {
+      habDestino = get('movDestinoHab');
+      if (!habDestino) {
+        showToast('Ingresa el número de habitación destino.', 'error'); return;
+      }
+      if (!isValidRoom(habDestino)) {
+        showToast(`La habitación ${habDestino} no es válida.`, 'error'); return;
+      }
+      const exist = tvs.find(t => t.estado === 'activo' && (t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') && t.habitacion === habDestino && String(t.id) !== String(tvId));
+      if (exist) {
+        showToast(`La habitación ${habDestino} ya tiene el TV [${exist.codigo}]. Selecciona otra habitación.`, 'error'); return;
+      }
+      destino = `${destino} - Hab. ${habDestino}`;
+    }
+  }
+
   if (!tvId) {
     showToast('Seleccione un TV válido de la lista.', 'error'); return;
   }
@@ -2958,8 +3015,14 @@ document.getElementById('formMovimiento').addEventListener('submit', async e => 
   btnSubmit.disabled = true;
 
   try {
+    let pisoDestino = '';
+    if (tipo === 'reingreso' && habDestino) {
+      pisoDestino = get('movDestinoSelect') || '';
+    } else if (tipo === 'traslado_hab' && habDestino) {
+      pisoDestino = get('movDestinoSelect') || get('asignarArea') || '';
+    }
     const mov = {
-      id: uid(), tvId, tipo, fecha, responsable, motivo, origen, destino, habDestino,
+      id: uid(), tvId, tipo, fecha, responsable, motivo, origen, destino, habDestino, pisoDestino,
       tvReemplazo: window._tvReemplazo || null,
       tvSaliente: (window._tvReemplazo && window._tvReemplazo.destino) || '',
       creadoEn: new Date().toISOString()
@@ -2995,7 +3058,19 @@ document.getElementById('formMovimiento').addEventListener('submit', async e => 
       if (tipo === 'entrada_taller')  { updates.estado = 'taller'; updates.tallerEstado = document.getElementById('movTallerEstado').value || 'inoperativo'; updates.ubicacion = 'Taller'; updates.habitacion = ''; updates.piso = ''; }
       if (tipo === 'retorno_taller')  { updates.estado = 'activo'; updates.tallerEstado = ''; if (mov.habDestino) { updates.ubicacion = 'Habitacion'; updates.habitacion = mov.habDestino; if (mov.pisoDestino || tv.piso) updates.piso = mov.pisoDestino || tv.piso; } }
       if (tipo === 'baja')            updates.estado = 'baja';
-      if (tipo === 'reingreso')       { updates.estado = 'activo'; updates.ubicacion = 'Almacen'; updates.habitacion = ''; updates.piso = ''; updates.tallerEstado = ''; }
+      if (tipo === 'reingreso')       {
+        updates.estado = 'activo';
+        updates.tallerEstado = '';
+        if (mov.habDestino) {
+          updates.ubicacion = 'Habitacion';
+          updates.habitacion = mov.habDestino;
+          updates.piso = mov.pisoDestino || '';
+        } else {
+          updates.ubicacion = 'Almacen';
+          updates.habitacion = '';
+          updates.piso = '';
+        }
+      }
       if (tipo === 'traslado_hab')    {
         updates.estado = 'activo';
         if (mov.habDestino) { updates.ubicacion = 'Habitacion'; updates.habitacion = mov.habDestino; if (mov.pisoDestino || tv.piso) updates.piso = mov.pisoDestino || tv.piso; }
