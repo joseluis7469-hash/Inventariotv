@@ -2204,11 +2204,6 @@ if (btn.dataset.val === 'entrada_taller') {
           origenSelect.value = 'Taller';
           origenSelect.disabled = true;
         }
-        destInput.style.display = 'none';
-        destSelect.style.display = '';
-        renderMovDestinoSelect();
-        destSelect.value = '';
-        setTimeout(() => destSelect.focus(), 100);
       }
     }
 
@@ -2233,6 +2228,14 @@ if (btn.dataset.val === 'entrada_taller') {
         } else {
             destSelect.value = '';
         }
+      }
+    } else if (btn.dataset.val === 'reingreso') {
+      if (destInput) destInput.style.display = 'none';
+      if (destSelect) {
+        destSelect.style.display = '';
+        renderMovDestinoSelect();
+        destSelect.value = '';
+        setTimeout(() => destSelect.focus(), 100);
       }
     } else {
       if (destSelect) destSelect.style.display = 'none';
