@@ -221,6 +221,41 @@ function showAlertaHabitacion(hab, tv) {
   openModal('modalAlertaHab');
 }
 
+let _nuevaAreaCallback = null;
+
+function mostrarModalNuevaArea(callback) {
+  _nuevaAreaCallback = callback;
+  const input = document.getElementById('inputNuevaArea');
+  if (input) {
+    input.value = '';
+    openModal('modalNuevaArea', '#inputNuevaArea');
+  }
+}
+
+function confirmarNuevaArea() {
+  const input = document.getElementById('inputNuevaArea');
+  const valor = input ? input.value.trim() : '';
+  if (!valor) {
+    showToast('Ingresa un nombre para el área.', 'error');
+    return;
+  }
+  const custom = loadAreas();
+  if (!custom.includes(valor)) {
+    custom.push(valor);
+    saveAreas(custom);
+  }
+  closeModal('modalNuevaArea');
+  if (_nuevaAreaCallback) {
+    _nuevaAreaCallback(valor);
+    _nuevaAreaCallback = null;
+  }
+}
+
+function cancelarNuevaArea() {
+  closeModal('modalNuevaArea');
+  _nuevaAreaCallback = null;
+}
+
 let _lastFocusedElement = null;
 
 function openModal(id, focusSelector) {
@@ -1644,24 +1679,15 @@ function toggleAsignarHabNumero(area) {
 }
 
 document.getElementById('asignarArea').addEventListener('change', function() {
-  if (this.value === 'otro') {
-    const nuevaArea = prompt('Ingrese el nombre de la nueva Área:');
-    if (nuevaArea && nuevaArea.trim()) {
-      const areaTrimmed = nuevaArea.trim();
-      const custom = loadAreas();
-      if (!custom.includes(areaTrimmed)) {
-        custom.push(areaTrimmed);
-        saveAreas(custom);
-      }
+  const self = this;
+  if (self.value === 'otro') {
+    mostrarModalNuevaArea(function(areaCreada) {
       renderAsignarAreas();
-      this.value = areaTrimmed;
-      toggleAsignarHabNumero(areaTrimmed);
-    } else {
-      this.value = '';
-      toggleAsignarHabNumero('');
-    }
+      self.value = areaCreada;
+      toggleAsignarHabNumero(areaCreada);
+    });
   } else {
-    toggleAsignarHabNumero(this.value);
+    toggleAsignarHabNumero(self.value);
   }
   const selHab = document.getElementById('asignarHabNumero');
   if (selHab && !selHab.disabled && selHab.options.length > 1) selHab.focus();
@@ -2219,19 +2245,10 @@ if (btn.dataset.val === 'entrada_taller') {
       if (destSelect) {
         destSelect.style.display = '';
         renderMovDestinoSelect();
-        const nuevaArea = prompt('Ingrese el nombre de la nueva Área/Destino:');
-        if (nuevaArea && nuevaArea.trim()) {
-            const areaTrimmed = nuevaArea.trim();
-            const custom = loadAreas();
-            if (!custom.includes(areaTrimmed)) {
-                custom.push(areaTrimmed);
-                saveAreas(custom);
-                renderMovDestinoSelect();
-            }
-            destSelect.value = areaTrimmed;
-        } else {
-            destSelect.value = '';
-        }
+        mostrarModalNuevaArea(function(areaCreada) {
+          renderMovDestinoSelect();
+          destSelect.value = areaCreada;
+        });
       }
     } else if (btn.dataset.val === 'reingreso') {
       if (destInput) destInput.style.display = 'none';
@@ -2311,20 +2328,13 @@ function renderMovDestinoSelect() {
 
 if (document.getElementById('movDestinoSelect')) {
   document.getElementById('movDestinoSelect').addEventListener('change', function() {
-    if (this.value === 'nueva') {
-      const nuevaArea = prompt('Ingrese el nombre de la nueva Área/Destino:');
-      if (nuevaArea && nuevaArea.trim()) {
-        const areaTrimmed = nuevaArea.trim();
-        const custom = loadAreas();
-        if (!custom.includes(areaTrimmed)) {
-          custom.push(areaTrimmed);
-          saveAreas(custom);
-          renderMovDestinoSelect();
-        }
-        this.value = areaTrimmed;
-      } else {
-        this.value = '';
-      }
+    const self = this;
+    if (self.value === 'nueva') {
+      mostrarModalNuevaArea(function(areaCreada) {
+        renderMovDestinoSelect();
+        self.value = areaCreada;
+      });
+      return;
     }
     const selTipo = document.getElementById('movTipo');
     const grp = document.getElementById('grpMovDestinoHab');

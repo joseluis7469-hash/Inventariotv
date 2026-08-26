@@ -1075,6 +1075,24 @@
     </div>
   </div>
 
+  <!-- MODAL: NUEVA AREA -->
+  <div class="modal-overlay" id="modalNuevaArea">
+    <div class="modal modal-sm" style="max-width: 400px;">
+      <div class="modal-header" style="background: linear-gradient(135deg, rgba(99,179,237,0.15), rgba(99,179,237,0.05)); border-bottom: 1px solid rgba(99,179,237,0.3);">
+        <h3 style="color: var(--accent);">➕ Nueva Área / Destino</h3>
+        <button class="modal-close" onclick="cancelarNuevaArea()">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 1.5rem;">
+        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary); font-size: 0.85rem;">Nombre del área:</label>
+        <input type="text" id="inputNuevaArea" placeholder="Ej: Recepción, Lobby, Sala de Eventos..." style="width: 100%; padding: 0.7rem 0.9rem; background: var(--bg-card); border: 1.5px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.9rem; outline: none; transition: var(--transition);" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'" />
+        <div style="display: flex; gap: 0.75rem; margin-top: 1.2rem;">
+          <button onclick="cancelarNuevaArea()" style="flex: 1; padding: 0.7rem; background: transparent; border: 1.5px solid var(--border); border-radius: var(--radius-sm); color: var(--text-secondary); font-weight: 600; cursor: pointer; transition: var(--transition);" onmouseover="this.style.borderColor='var(--accent)'; this.style.color='var(--text-primary)'" onmouseout="this.style.borderColor='var(--border)'; this.style.color='var(--text-secondary)'">Cancelar</button>
+          <button onclick="confirmarNuevaArea()" style="flex: 1; padding: 0.7rem; background: linear-gradient(135deg, var(--accent), #63b3ed); border: none; border-radius: var(--radius-sm); color: #fff; font-weight: 600; cursor: pointer; transition: var(--transition);" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='none'">Agregar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- TOAST NOTIFICATION -->
   <div class="toast" id="toast"></div>
 
