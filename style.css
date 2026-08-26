@@ -779,7 +779,8 @@ textarea { resize: vertical; min-height: 80px; }
 /* ── Tarjetas de tipo de movimiento ── */
 .mov-tipo-cards {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(6, 1fr);
+  grid-auto-flow: dense;
   gap: 0.5rem;
 }
 
@@ -795,6 +796,21 @@ textarea { resize: vertical; min-height: 80px; }
   cursor: pointer;
   transition: var(--transition);
   font-family: inherit;
+}
+
+.mov-tipo-btn.mov-grande {
+  grid-column: span 3;
+  padding: 0.85rem 0.5rem;
+}
+
+.mov-tipo-btn.mov-grande .mov-tipo-ico { font-size: 1.6rem; }
+
+.mov-tipo-btn.mov-grande .mov-tipo-txt {
+  font-size: 0.72rem;
+}
+
+.mov-tipo-btn.mov-peq {
+  grid-column: span 2;
 }
 
 .mov-tipo-btn:hover {
@@ -982,10 +998,16 @@ textarea { resize: vertical; min-height: 80px; }
   .mov-panel-right { order: 2; }
   .mov-tv-img-wrap { height: 140px; }
   .mov-tipo-cards { grid-template-columns: repeat(3, 1fr); }
+  .mov-tipo-btn.mov-grande { grid-column: span 1; padding: 0.65rem 0.4rem; }
+  .mov-tipo-btn.mov-grande .mov-tipo-ico { font-size: 1.3rem; }
+  .mov-tipo-btn.mov-grande .mov-tipo-txt { font-size: 0.65rem; }
+  .mov-tipo-btn.mov-peq { grid-column: span 1; }
 }
 
 @media (max-width: 500px) {
   .mov-tipo-cards { grid-template-columns: repeat(2, 1fr); }
+  .mov-tipo-btn.mov-grande { grid-column: span 1; }
+  .mov-tipo-btn.mov-peq { grid-column: span 1; }
   .mov-2col { grid-template-columns: 1fr; }
 }
 

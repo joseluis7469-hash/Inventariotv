@@ -319,27 +319,23 @@
           <div class="mov-section">
             <div class="mov-section-label">Tipo de Movimiento <span class="required">*</span></div>
             <div class="mov-tipo-cards" id="movTipoCards">
-              <button type="button" class="mov-tipo-btn" data-val="traslado_hab">
+              <button type="button" class="mov-tipo-btn mov-grande" data-val="traslado_hab">
                 <span class="mov-tipo-ico">🏨</span>
                 <span class="mov-tipo-txt">Traslado Habitación</span>
               </button>
-              <button type="button" class="mov-tipo-btn" data-val="entrada_taller">
+              <button type="button" class="mov-tipo-btn mov-grande" data-val="entrada_taller" onclick="document.getElementById('movDestino').value='AL TALLER'; document.getElementById('movDestino').removeAttribute('readonly'); document.getElementById('movDestino').focus();">
                 <span class="mov-tipo-ico">🔧</span>
                 <span class="mov-tipo-txt">Envío a Taller</span>
               </button>
-              <button type="button" class="mov-tipo-btn" data-val="retorno_taller">
-                <span class="mov-tipo-ico">✅</span>
-                <span class="mov-tipo-txt">Retorno de Taller</span>
-              </button>
-              <button type="button" class="mov-tipo-btn" data-val="baja">
+              <button type="button" class="mov-tipo-btn mov-peq" data-val="baja">
                 <span class="mov-tipo-ico">❌</span>
                 <span class="mov-tipo-txt">Dar de Baja</span>
               </button>
-              <button type="button" class="mov-tipo-btn" data-val="reingreso">
+              <button type="button" class="mov-tipo-btn mov-peq" data-val="reingreso">
                 <span class="mov-tipo-ico">♻️</span>
-                <span class="mov-tipo-txt">Reingreso</span>
+                <span class="mov-tipo-txt">Salida del Taller</span>
               </button>
-              <button type="button" class="mov-tipo-btn" data-val="otro">
+              <button type="button" class="mov-tipo-btn mov-peq" data-val="otro">
                 <span class="mov-tipo-ico">📝</span>
                 <span class="mov-tipo-txt">Otro</span>
               </button>
@@ -363,7 +359,7 @@
               </div>
               <div class="mov-ruta-box">
                 <div class="mov-ruta-tag mov-ruta-tag-dest">DESTINO</div>
-                <input type="text" id="movDestino" readonly class="mov-ruta-select" value="" />
+                <input type="text" id="movDestino" class="mov-ruta-select" value="" />
                 <select id="movDestinoSelect" class="mov-ruta-select" style="display:none;"></select>
               </div>
             </div>
@@ -446,9 +442,8 @@
             <option value="">Todos los tipos</option>
             <option value="traslado_hab">Traslado habitación</option>
             <option value="entrada_taller">Envío a taller</option>
-            <option value="retorno_taller">Retorno de taller</option>
             <option value="baja">Baja</option>
-            <option value="reingreso">Reingreso</option>
+            <option value="reingreso">Salida del Taller</option>
             <option value="otro">Otro</option>
             <option value="tv_creado">TV registrado</option>
             <option value="tv_editado">TV editado</option>
@@ -1050,5 +1045,50 @@
   <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="app.js"></script>
+  <script>
+    // Función para asegurar que el campo destino funcione correctamente
+    document.addEventListener('DOMContentLoaded', function() {
+      // Obtener todos los botones de tipo de movimiento
+      const tipoButtons = document.querySelectorAll('.mov-tipo-btn');
+      
+      tipoButtons.forEach(button => {
+        button.addEventListener('click', function() {
+          const destInput = document.getElementById('movDestino');
+          const tipoValue = this.dataset.val;
+          
+          // Si seleccionamos "Envío a taller", poner "AL TALLER" en el destino
+          if (tipoValue === 'entrada_taller') {
+            // Remover readonly si existe
+            destInput.removeAttribute('readonly');
+            destInput.readonly = false;
+            // Poner el valor inmediatamente
+            destInput.value = 'AL TALLER';
+            // Forzar actualización visual
+            destInput.style.borderColor = '#2d3a4f';
+            console.log('Movimiento a taller seleccionado - Destino: AL TALLER');
+          } else {
+            // Para otras opciones, poner el texto del botón
+            const txtSpan = this.querySelector('.mov-tipo-txt');
+            if (txtSpan) {
+              destInput.value = txtSpan.textContent;
+            }
+          }
+        });
+      });
+      
+      // También verificar si ya hay un TV seleccionado y el tipo es entrada_taller
+      const movTipo = document.getElementById('movTipo');
+      if (movTipo) {
+        movTipo.addEventListener('change', function() {
+          const destInput = document.getElementById('movDestino');
+          if (this.value === 'entrada_taller') {
+            destInput.removeAttribute('readonly');
+            destInput.readonly = false;
+            destInput.value = 'AL TALLER';
+          }
+        });
+      }
+    });
+  </script>
 </body>
 </html>

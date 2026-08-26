@@ -148,6 +148,27 @@ let tvsLoaded = false;
 let movsLoaded = false;
 let metadataLoaded = false;
 
+// Limpieza automática: TVs en Taller con habitación asignada
+async function limpiarTVsEnTaller() {
+  const tvs = window.appData.tvs || [];
+  for (const tv of tvs) {
+    const ubic = (tv.ubicacion || '').toLowerCase();
+    const esTaller = ubic === 'taller' || (tv.estado || '').toLowerCase() === 'taller';
+    if (esTaller && (tv.habitacion || tv.piso || tv.ubicacion !== 'Taller')) {
+      try {
+        await db.collection('tvs').doc(tv.id).update({
+          ubicacion: 'Taller',
+          habitacion: '',
+          piso: ''
+        });
+        console.log(`TV ${tv.codigo} limpiado: ubicación corregida a Taller, habitación y piso eliminados.`);
+      } catch (e) {
+        console.error(`Error limpiando TV ${tv.codigo}:`, e);
+      }
+    }
+  }
+}
+
 function checkAppReady() {
   if (!window._authReady) return;
   if (tvsLoaded && movsLoaded && metadataLoaded) {
@@ -258,6 +279,7 @@ db.collection('tvs').onSnapshot(snapshot => {
   window.appData.tvs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   if (!tvsLoaded) {
     tvsLoaded = true;
+    limpiarTVsEnTaller();
     checkAppReady();
   } else {
     // Si ya cargó, actualizar vista actual

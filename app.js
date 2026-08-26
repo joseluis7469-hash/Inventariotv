@@ -184,9 +184,8 @@ function fmtDateOnly(iso) {
 const tipoLabel = {
   traslado_hab:   '🔀 Traslado habitación',
   entrada_taller: '🔧 Enviado a taller',
-  retorno_taller: '✅ Retorno de taller',
   baja:           '❌ Dado de baja',
-  reingreso:      '🔄 Reingreso al servicio',
+  reingreso:      '🔄 Salida del Taller',
   otro:           '📝 Otro',
   tv_creado:      '➕ TV registrado',
   tv_editado:     '✏️ TV editado',
@@ -482,11 +481,6 @@ function renderDashboard() {
 
 // ─── INVENTARIO ──────────────────────────────────────────────
 function renderInventario(filtroEstado = '', filtroUbicacion = '', busqueda = '') {
-  // Limpiar siempre el campo de búsqueda al mostrar el inventario
-  const searchInput = document.getElementById('searchInventario');
-  if (searchInput) {
-    searchInput.value = '';
-  }
   let tvs = loadTVs();
 
   if (filtroEstado) tvs = tvs.filter(t => t.estado === filtroEstado);
@@ -516,7 +510,7 @@ function renderInventario(filtroEstado = '', filtroUbicacion = '', busqueda = ''
       <td style="font-size:0.78rem">${fmtDateOnly(t.fechaIngreso)}</td>
       <td>
         <div class="actions-cell">
-          <button class="btn btn-assign btn-sm" title="Asignar a habitación" onclick="abrirAsignarHabitacion('${t.id}')" ${t.ubicacion === 'Habitacion' ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>🏨 Asignar</button>
+          <button class="btn btn-assign btn-sm" title="Asignar a habitación" onclick="abrirAsignarHabitacion('${t.id}')" ${(t.ubicacion === 'Habitacion' || (t.ubicacion || '').toLowerCase() === 'taller') ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>🏨 Asignar</button>
           <button class="btn btn-secondary btn-sm" onclick="editarTV('${t.id}')" title="Editar datos del TV">✏️ Editar</button>
           ${hasPermission('cambiar_serial') ? `<button class="btn btn-secondary btn-sm" onclick="abrirCambioSerial('${t.id}')" title="Modificar serial del TV" style="background:rgba(179,110,255,0.15); border-color:rgba(179,110,255,0.4); color:#b36eff;">🔑 Serial</button>` : ''}
           <button class="btn btn-danger btn-sm" onclick="confirmarEliminar('${t.id}')" title="Ocultar registro">🗑️ Eliminar</button>
@@ -2021,12 +2015,11 @@ function populateMovTV() {
   if (selTipo && !selTipo.options.length) {
     selTipo.innerHTML = `
       <option value="">-- Seleccionar --</option>
-      <option value="traslado_hab">Traslado a otra habitación</option>
-      <option value="entrada_taller">Envío a taller</option>
-      <option value="retorno_taller">Retorno de taller</option>
-      <option value="baja">Dar de baja</option>
-      <option value="reingreso">Reingreso al servicio</option>
-      <option value="otro">Otro</option>
+      <option value="traslado_hab">HABITACION</option>
+      <option value="entrada_taller">TALLER</option>
+      <option value="retorno_taller">SALIDA DEL TALLER</option>
+      <option value="baja">DE BAJA</option>
+      <option value="otro">OTROS</option>
     `;
   }
   
@@ -2173,29 +2166,29 @@ document.querySelectorAll('.mov-tipo-btn').forEach(btn => {
     const grpMovTaller = document.getElementById('grpMovTallerEstado');
     if (grpMovTaller) {
       grpMovTaller.style.display = btn.dataset.val === 'entrada_taller' ? '' : 'none';
-      if (btn.dataset.val === 'entrada_taller') {
-        // Establecer origen según la ubicación actual del TV
-        const origenSelect = document.getElementById('movOrigen');
-        const tvSelect = document.getElementById('movTV');
-        if (origenSelect && tvSelect) {
-          const tv = tvs.find(t => String(t.id) === String(tvSelect.value));
-          if (tv) {
-            // Si el TV está en habitación, poner el número de habitación
-            if (tv.ubicacion === 'Habitacion' && tv.habitacion) {
-              origenSelect.value = tv.habitacion;
-            } else if (tv.ubicacion === 'Taller') {
-              origenSelect.value = 'Taller';
-            } else {
-              // Otherwise, use the location
-              origenSelect.value = tv.ubicacion || '';
-            }
+if (btn.dataset.val === 'entrada_taller') {
+      // Establecer origen según la ubicación actual del TV
+      const origenSelect = document.getElementById('movOrigen');
+      const tvSelect = document.getElementById('movTV');
+      if (origenSelect && tvSelect) {
+        const tv = tvs.find(t => String(t.id) === String(tvSelect.value));
+        if (tv) {
+          // Si el TV está en habitación (con o sin acento), poner el número de habitación
+          if (tv.ubicacion === 'Habitacion' || tv.ubicacion === 'Habitación') {
+            origenSelect.value = tv.habitacion || tv.ubicacion || '';
+          } else if (tv.ubicacion === 'Taller') {
+            origenSelect.value = 'Taller';
           } else {
-            origenSelect.value = '';
+            // Otherwise, use the location
+            origenSelect.value = tv.ubicacion || '';
           }
-          origenSelect.disabled = true;
+        } else {
+          origenSelect.value = '';
         }
-        document.getElementById('movTallerEstado').value = 'inoperativo';
+        origenSelect.disabled = true;
       }
+      document.getElementById('movTallerEstado').value = 'inoperativo';
+    }
       if (btn.dataset.val === 'retorno_taller') {
         // Establecer origen como "Taller" para retorno de taller
         const origenSelect = document.getElementById('movOrigen');
@@ -2233,8 +2226,20 @@ document.querySelectorAll('.mov-tipo-btn').forEach(btn => {
       if (destSelect) destSelect.style.display = 'none';
       if (destInput) {
         destInput.style.display = '';
-        destInput.value = btn.querySelector('.mov-tipo-txt').textContent;
-        destInput.dispatchEvent(new Event('change'));
+        // Remover readonly y asegurar que se quede removido
+        destInput.removeAttribute('readonly');
+        destInput.readonly = false;
+        // Establecer valor inmediatamente y directamente
+        if (btn.dataset.val === 'entrada_taller') {
+          destInput.value = 'AL TALLER';
+          // Forzar actualización visual
+          destInput.style.borderColor = '#2d3a4f';
+        } else {
+          destInput.value = btn.querySelector('.mov-tipo-txt').textContent;
+        }
+        // Disparar cambio para que otros handlers lo detecten
+        const changeEvent = new Event('change', { bubbles: true });
+        destInput.dispatchEvent(changeEvent);
       }
     }
 
@@ -2987,10 +2992,10 @@ document.getElementById('formMovimiento').addEventListener('submit', async e => 
     const tv = tvs.find(t => String(t.id) === String(tvId));
     if (tv) {
       const updates = {};
-      if (tipo === 'entrada_taller')  { updates.estado = 'taller'; updates.tallerEstado = document.getElementById('movTallerEstado').value || 'inoperativo'; }
+      if (tipo === 'entrada_taller')  { updates.estado = 'taller'; updates.tallerEstado = document.getElementById('movTallerEstado').value || 'inoperativo'; updates.ubicacion = 'Taller'; updates.habitacion = ''; updates.piso = ''; }
       if (tipo === 'retorno_taller')  { updates.estado = 'activo'; updates.tallerEstado = ''; if (mov.habDestino) { updates.ubicacion = 'Habitacion'; updates.habitacion = mov.habDestino; if (mov.pisoDestino || tv.piso) updates.piso = mov.pisoDestino || tv.piso; } }
       if (tipo === 'baja')            updates.estado = 'baja';
-      if (tipo === 'reingreso')       updates.estado = 'activo';
+      if (tipo === 'reingreso')       { updates.estado = 'activo'; updates.ubicacion = 'Almacen'; updates.habitacion = ''; updates.piso = ''; updates.tallerEstado = ''; }
       if (tipo === 'traslado_hab')    {
         updates.estado = 'activo';
         if (mov.habDestino) { updates.ubicacion = 'Habitacion'; updates.habitacion = mov.habDestino; if (mov.pisoDestino || tv.piso) updates.piso = mov.pisoDestino || tv.piso; }
@@ -3140,6 +3145,12 @@ function abrirAsignarHabitacion(tvId) {
   const tv = loadTVs().find(t => String(t.id) === String(tvId));
   if (!tv) return;
 
+  const ubic = (tv.ubicacion || '').toLowerCase();
+  if (ubic === 'taller') {
+    showToast(`⚠️ El TV [${tv.codigo}] se encuentra en el TALLER. No puede ser asignado a ninguna habitación hasta que regrese a Almacén.`, 'error');
+    return;
+  }
+
   if (tv.ubicacion && tv.ubicacion !== 'Almacen' && tv.ubicacion !== 'Almacén') {
     showToast(`El TV [${tv.codigo}] se encuentra en "${tv.ubicacion}". Solo se pueden asignar TVs desde Almacén.`, 'error');
     return;
@@ -3214,10 +3225,18 @@ document.getElementById('btnConfirmAsignar').addEventListener('click', async () 
 
   const tvsCheck = loadTVs();
   const tvCheck = tvsCheck.find(t => String(t.id) === String(_asignarTvId));
-  if (tvCheck && tvCheck.ubicacion && tvCheck.ubicacion !== 'Almacen' && tvCheck.ubicacion !== 'Almacén') {
-    showToast(`El TV [${tvCheck.codigo}] ya no está en Almacén. Ubicación actual: ${tvCheck.ubicacion}.`, 'error');
-    closeModal('modalAsignar');
-    return;
+  if (tvCheck) {
+    const ubCheck = (tvCheck.ubicacion || '').toLowerCase();
+    if (ubCheck === 'taller') {
+      showToast(`⚠️ El TV [${tvCheck.codigo}] se encuentra en el TALLER. No puede ser asignado hasta que regrese a Almacén.`, 'error');
+      closeModal('modalAsignar');
+      return;
+    }
+    if (tvCheck.ubicacion && tvCheck.ubicacion !== 'Almacen' && tvCheck.ubicacion !== 'Almacén') {
+      showToast(`El TV [${tvCheck.codigo}] ya no está en Almacén. Ubicación actual: ${tvCheck.ubicacion}.`, 'error');
+      closeModal('modalAsignar');
+      return;
+    }
   }
 
   const hab  = document.getElementById('asignarHabNumero').value.trim();
@@ -3353,7 +3372,7 @@ function renderAsignarTVPage() {
                     <td>${t.modelo}</td>
                     <td>${estadoBadge[t.estado] || t.estado}</td>
                     <td>
-                      <button class="btn btn-assign btn-sm" onclick="abrirAsignarHabitacion('${t.id}')">
+                      <button class="btn btn-assign btn-sm" onclick="abrirAsignarHabitacion('${t.id}')" ${(t.ubicacion === 'Habitacion' || (t.ubicacion || '').toLowerCase() === 'taller') ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>
                         🏨 Asignar a Habitación
                       </button>
                     </td>
