@@ -213,6 +213,14 @@ function showToast(msg, type = 'success', duration = 3200) {
   setTimeout(() => { t.className = 'toast'; }, duration);
 }
 
+function showAlertaHabitacion(hab, tv) {
+  document.getElementById('alertaHabNum').textContent = hab;
+  document.getElementById('alertaHabCodigo').textContent = tv.codigo || '—';
+  document.getElementById('alertaHabMarca').textContent = `${tv.marca || '—'} ${tv.modelo || ''}`.trim();
+  document.getElementById('alertaHabSerial').textContent = tv.serial || '—';
+  openModal('modalAlertaHab');
+}
+
 let _lastFocusedElement = null;
 
 function openModal(id, focusSelector) {
@@ -1829,7 +1837,7 @@ document.getElementById('formTV').addEventListener('submit', e => {
       if (tvEnHab) {
         highlightField('tvHabitacion');
         document.getElementById('tvHabitacion').focus();
-        showToast(`La habitación ${habVal} ya tiene el TV [${tvEnHab.codigo}].`, 'error');
+        showAlertaHabitacion(habVal, tvEnHab);
         return;
       }
     }
@@ -3001,7 +3009,8 @@ document.getElementById('formMovimiento').addEventListener('submit', async e => 
       }
       const exist = tvs.find(t => t.estado === 'activo' && (t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') && t.habitacion === habDestino && String(t.id) !== String(tvId));
       if (exist) {
-        showToast(`La habitación ${habDestino} ya tiene el TV [${exist.codigo}]. Selecciona otra habitación.`, 'error'); return;
+        showAlertaHabitacion(habDestino, exist);
+        return;
       }
       destino = `${destino} - Hab. ${habDestino}`;
     }
@@ -3334,7 +3343,7 @@ document.getElementById('btnConfirmAsignar').addEventListener('click', async () 
   const tvsExistCheck = loadTVs();
   const tvEnHabitacion = tvsExistCheck.find(t => t.habitacion === hab && (t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') && String(t.id) !== String(_asignarTvId));
   if (tvEnHabitacion) {
-    showToast(`La habitación ${hab} ya tiene el TV [${tvEnHabitacion.codigo}] ${tvEnHabitacion.marca} ${tvEnHabitacion.modelo}.`, 'error');
+    showAlertaHabitacion(hab, tvEnHabitacion);
     return;
   }
   
