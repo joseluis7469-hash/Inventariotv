@@ -2403,8 +2403,8 @@ if (elMovDestinoHab) {
     );
     
     if (exist) {
-      aviso.textContent = `¡Atención! La habitación ${habVal} ya posee el TV: [${exist.codigo}] ${exist.marca}.`;
-      aviso.style.display = 'block';
+      showAlertaHabitacion(habVal, exist);
+      aviso.style.display = 'none';
     } else {
       aviso.style.display = 'none';
     }
