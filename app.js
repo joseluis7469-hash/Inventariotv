@@ -3454,18 +3454,23 @@ document.getElementById('btnConfirmAsignar').addEventListener('click', async () 
   const resp = respList.join(', ');
   const nota = document.getElementById('asignarNota').value.trim();
 
-  if (!hab) { showToast('Ingresa el número de habitación.', 'error'); return; }
+  const esAreaHabitacion = (area || '').toLowerCase().includes('premium') || (area || '').toLowerCase().includes('anillo');
 
-  const tvsExistCheck = loadTVs();
-  const tvEnHabitacion = tvsExistCheck.find(t => t.habitacion === hab && (t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') && String(t.id) !== String(_asignarTvId));
-  if (tvEnHabitacion) {
-    showAlertaHabitacion(hab, tvEnHabitacion);
-    return;
-  }
-  
+  if (!area) { showToast('Selecciona un área.', 'error'); return; }
+
   if (area === 'otro') {
     showToast('Por favor seleccione o ingrese una nueva área.', 'error');
     return;
+  }
+
+  if (esAreaHabitacion) {
+    if (!hab) { showToast('Ingresa el número de habitación.', 'error'); return; }
+    const tvsExistCheck = loadTVs();
+    const tvEnHabitacion = tvsExistCheck.find(t => t.habitacion === hab && (t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') && String(t.id) !== String(_asignarTvId));
+    if (tvEnHabitacion) {
+      showAlertaHabitacion(hab, tvEnHabitacion);
+      return;
+    }
   }
 
   if (!resp) { showToast('Ingresa el nombre del responsable.', 'error'); return; }
@@ -3486,16 +3491,17 @@ document.getElementById('btnConfirmAsignar').addEventListener('click', async () 
     const tvsList = loadTVs();
     const tvActual = tvsList.find(t => String(t.id) === String(_asignarTvId));
     const origenUbic = tvActual ? (tvActual.ubicacion === 'Habitacion' ? `Hab. ${tvActual.habitacion || '?'}` : tvActual.ubicacion || 'Almacén') : 'Almacén';
+    const destinoVal = esAreaHabitacion ? `Hab. ${hab}` : area;
     const mov = {
       id: uid(),
       tvId: _asignarTvId,
       tipo: 'traslado_hab',
       fecha: fechaMov,
       responsable: resp,
-      motivo: nota || `Asignación a habitación ${hab}`,
+      motivo: nota || (esAreaHabitacion ? `Asignación a habitación ${hab}` : `Asignación a ${area}`),
       origen: origenUbic,
-      destino: `Hab. ${hab}`,
-      habDestino: hab,
+      destino: destinoVal,
+      habDestino: esAreaHabitacion ? hab : '',
       pisoDestino: area,
       observaciones: '',
       creadoEn: new Date().toISOString()
@@ -3503,11 +3509,10 @@ document.getElementById('btnConfirmAsignar').addEventListener('click', async () 
     
     await db.collection('movimientos').doc(mov.id).set(mov);
 
-    // Actualizar TV
     const updates = {
-      habitacion: hab,
+      habitacion: esAreaHabitacion ? hab : '',
       piso: area || '',
-      ubicacion: 'Habitacion',
+      ubicacion: esAreaHabitacion ? 'Habitacion' : area,
       estado: 'activo'
     };
     await db.collection('tvs').doc(_asignarTvId).update(updates);
@@ -3515,7 +3520,7 @@ document.getElementById('btnConfirmAsignar').addEventListener('click', async () 
     _asignarTvId = null;
     closeModal('modalAsignar');
     renderAsignarTVPage();
-    showToast(`TV asignado a habitación ${hab} correctamente. ✅`, 'success');
+    showToast(esAreaHabitacion ? `TV asignado a habitación ${hab} correctamente. ✅` : `TV asignado a ${area} correctamente. ✅`, 'success');
     const tvsAsig = loadTVs();
     const tvAsig = tvsAsig.find(t => String(t.id) === String(mov.tvId));
     setTimeout(() => imprimirActaFromData(mov, tvAsig), 1000);
