@@ -3362,13 +3362,7 @@ function abrirAsignarHabitacion(tvId) {
 
   const ubic = (tv.ubicacion || '').toLowerCase();
   if (ubic === 'taller') {
-    showToast(`⚠️ El TV [${tv.codigo}] se encuentra en el TALLER. No puede ser asignado a ninguna habitación hasta que regrese a Almacén.`, 'error');
-    return;
-  }
-
-  if (tv.ubicacion && tv.ubicacion !== 'Almacen' && tv.ubicacion !== 'Almacén') {
-    showToast(`El TV [${tv.codigo}] se encuentra en "${tv.ubicacion}". Solo se pueden asignar TVs desde Almacén.`, 'error');
-    return;
+    showToast(`ℹ️ El TV [${tv.codigo}] está en el TALLER. Será reubicado automáticamente.`, 'info');
   }
 
   _asignarTvId = tvId;
