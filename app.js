@@ -213,11 +213,38 @@ function showToast(msg, type = 'success', duration = 3200) {
 }
 
 function showAlertaHabitacion(hab, tv) {
+  _alertaAreaData = null;
+  const hdr = document.querySelector('#modalAlertaHab .modal-header');
+  hdr.querySelector('h3').textContent = '⚠️ Habitación con TV Asignado';
+  hdr.style.background = 'linear-gradient(135deg, rgba(255,193,7,0.15), rgba(255,193,7,0.05))';
   document.getElementById('alertaHabNum').textContent = hab;
   document.getElementById('alertaHabCodigo').textContent = tv.codigo || '—';
   document.getElementById('alertaHabMarca').textContent = `${tv.marca || '—'} ${tv.modelo || ''}`.trim();
   document.getElementById('alertaHabSerial').textContent = tv.serial || '—';
   openModal('modalAlertaHab');
+}
+
+let _alertaAreaData = null;
+
+function showAlertaArea(area, tv) {
+  _alertaAreaData = { area, tv };
+  const hdr = document.querySelector('#modalAlertaHab .modal-header');
+  hdr.querySelector('h3').textContent = '⚠️ Área con TV Asignado';
+  hdr.style.background = 'linear-gradient(135deg, rgba(255,107,107,0.15), rgba(255,107,107,0.05))';
+  document.getElementById('alertaHabNum').textContent = area;
+  document.getElementById('alertaHabCodigo').textContent = tv.codigo || '—';
+  document.getElementById('alertaHabMarca').textContent = `${tv.marca || '—'} ${tv.modelo || ''}`.trim();
+  document.getElementById('alertaHabSerial').textContent = tv.serial || '—';
+  openModal('modalAlertaHab');
+}
+
+function reubicarTvDesdeAlerta() {
+  if (!_alertaAreaData) return;
+  const { area, tv } = _alertaAreaData;
+  closeModal('modalAlertaHab');
+  mostrarModalReubicarTV(tv, area, function(seleccion, destinoFinal, estado) {
+    _alertaAreaData = null;
+  });
 }
 
 let _reubicarTvData = null;
@@ -2469,6 +2496,20 @@ if (document.getElementById('movDestinoSelect')) {
       if (habInput) { habInput.value = ''; habInput.disabled = false; }
       const aviso = document.getElementById('movDestinoHabAviso');
       if (aviso) aviso.style.display = 'none';
+    }
+
+    if (this.value && this.value !== 'nueva') {
+      const areaDestino = this.value;
+      const tvs = loadTVs();
+      const tvEnArea = tvs.find(t =>
+        t.ubicacion === areaDestino &&
+        (!t.habitacion || t.habitacion === '') &&
+        t.estado !== 'baja' &&
+        String(t.id) !== String(document.getElementById('movTvSelect')?.value || '')
+      );
+      if (tvEnArea) {
+        showAlertaArea(areaDestino, tvEnArea);
+      }
     }
   });
 }

@@ -1067,7 +1067,7 @@
         <button class="modal-close" onclick="closeModal('modalAlertaHab')">✕</button>
       </div>
       <div class="modal-body" style="text-align: center; padding: 1.5rem;">
-        <p style="margin-bottom: 1rem; color: var(--text-secondary);">La habitación <strong id="alertaHabNum" style="color: var(--text-primary); font-size: 1.1rem;"></strong> ya tiene un TV asignado:</p>
+        <p style="margin-bottom: 1rem; color: var(--text-secondary);">La ubicación <strong id="alertaHabNum" style="color: var(--text-primary); font-size: 1.1rem;"></strong> ya tiene un TV asignado:</p>
         <div id="alertaHabTvInfo" style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 1rem; margin-bottom: 1.2rem; text-align: left;">
           <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
             <span style="color: var(--text-secondary);">Código:</span>
@@ -1082,8 +1082,11 @@
             <code id="alertaHabSerial" style="color: var(--text-primary); background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px;"></code>
           </div>
         </div>
-        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.2rem;">Por favor seleccione otra habitación.</p>
-        <button onclick="closeModal('modalAlertaHab')" style="width: 100%; padding: 0.7rem; background: linear-gradient(135deg, #ffc107, #ffcd38); color: #000; border: none; border-radius: var(--radius-sm); font-weight: 600; cursor: pointer; font-size: 0.9rem;">Entendido</button>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.2rem;">Por favor seleccione otra habitación o reubique el TV existente.</p>
+        <div style="display: flex; gap: 0.5rem;">
+          <button onclick="reubicarTvDesdeAlerta()" style="flex:1; padding: 0.7rem; background: linear-gradient(135deg, #00f5a0, #00b371); color: #000; border: none; border-radius: var(--radius-sm); font-weight: 600; cursor: pointer; font-size: 0.9rem;">🔄 Reubicar TV</button>
+          <button onclick="closeModal('modalAlertaHab')" style="flex:1; padding: 0.7rem; background: linear-gradient(135deg, #ffc107, #ffcd38); color: #000; border: none; border-radius: var(--radius-sm); font-weight: 600; cursor: pointer; font-size: 0.9rem;">Entendido</button>
+        </div>
       </div>
     </div>
   </div>
