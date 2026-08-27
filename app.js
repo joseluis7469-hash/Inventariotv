@@ -232,6 +232,8 @@ function mostrarModalReubicarTV(tv, hab, callback) {
   document.getElementById('reubicarTVInfo').innerHTML = `⚠️ La habitación <strong>${hab}</strong> ya tiene el TV [<strong>${tv.codigo}</strong>] ${tv.marca} ${tv.modelo || ''}.`;
   document.getElementById('reubicarOtroGroup').style.display = 'none';
   document.getElementById('reubicarOtroInput').value = '';
+  const estadoSel = document.getElementById('reubicarEstado');
+  if (estadoSel) estadoSel.value = 'inoperativo';
   const btnConfirm = document.getElementById('btnConfirmarReubicacion');
   if (btnConfirm) btnConfirm.disabled = true;
   document.querySelectorAll('.reubicar-btn').forEach(b => b.style.borderColor = '');
