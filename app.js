@@ -3328,7 +3328,16 @@ function applyHistorialFilters() {
 let _asignarTvId = null;
 
 const DB_AREAS = 'hpa_areas';
-function loadAreas() { return window.appData?.metadata?.areas || []; }
+function loadAreas() {
+  const raw = window.appData?.metadata?.areas || [];
+  const seen = new Set();
+  return raw.filter(a => {
+    const k = a.toLowerCase().trim();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
 async function saveAreas(d) { await db.collection('config').doc('metadata').update({ areas: d }); }
 
 function renderAsignarAreas() {
