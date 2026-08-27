@@ -2497,9 +2497,11 @@ if (elMovDestinoHab) {
           window._tvReemplazoTipo = tipoReem;
           window._tvReemplazoEstado = estadoReem;
           const movDestino = document.getElementById('movDestino');
+          const destSelect = document.getElementById('movDestinoSelect');
           const grp = document.getElementById('grpMovDestinoHab');
+          const area = destSelect ? destSelect.value : '';
           if (movDestino) {
-            movDestino.value = `Hab. ${habVal}`;
+            movDestino.value = area ? `${area} - Hab. ${habVal}` : `Hab. ${habVal}`;
             movDestino.readOnly = true;
           }
           if (grp) grp.style.display = 'none';
@@ -2520,9 +2522,11 @@ if (elMovDestinoHab) {
       }
       if (window._tvReemplazo) return;
       const movDestino = document.getElementById('movDestino');
+      const destSelect = document.getElementById('movDestinoSelect');
       const grp = document.getElementById('grpMovDestinoHab');
+      const area = destSelect ? destSelect.value : '';
       if (movDestino) {
-        movDestino.value = `Hab. ${habVal}`;
+        movDestino.value = area ? `${area} - Hab. ${habVal}` : `Hab. ${habVal}`;
         movDestino.readOnly = true;
       }
       if (grp) grp.style.display = 'none';
