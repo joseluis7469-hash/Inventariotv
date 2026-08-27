@@ -3178,35 +3178,32 @@ document.getElementById('formMovimiento').addEventListener('submit', async e => 
       window._tvReemplazo = null;
     }
 
-    // Actualizar estado del TV
-    const tv = tvs.find(t => String(t.id) === String(tvId));
-    if (tv) {
-      const updates = {};
-      if (tipo === 'entrada_taller')  { updates.estado = 'taller'; updates.tallerEstado = document.getElementById('movTallerEstado').value || 'inoperativo'; updates.ubicacion = 'Taller'; updates.habitacion = ''; updates.piso = ''; }
-      if (tipo === 'baja')            { updates.estado = 'baja'; updates.ubicacion = 'Baja'; updates.habitacion = ''; updates.piso = ''; }
-      if (tipo === 'traslado_hab')    {
-        updates.estado = 'activo';
-        if (mov.habDestino) { updates.ubicacion = 'Habitacion'; updates.habitacion = mov.habDestino; if (mov.pisoDestino || tv.piso) updates.piso = mov.pisoDestino || tv.piso; }
+    // Actualizar estado del TV en Firestore directamente
+    const updates = {};
+    if (tipo === 'entrada_taller')  { updates.estado = 'taller'; updates.tallerEstado = document.getElementById('movTallerEstado').value || 'inoperativo'; updates.ubicacion = 'Taller'; updates.habitacion = ''; updates.piso = ''; }
+    if (tipo === 'baja')            { updates.estado = 'baja'; updates.ubicacion = 'Baja'; updates.habitacion = ''; updates.piso = ''; }
+    if (tipo === 'traslado_hab')    {
+      updates.estado = 'activo';
+      if (mov.habDestino) { updates.ubicacion = 'Habitacion'; updates.habitacion = mov.habDestino; if (mov.pisoDestino) updates.piso = mov.pisoDestino; }
+    }
+    if (tipo === 'otro') {
+      updates.estado = 'activo';
+      const destLower = (destino || '').toLowerCase();
+      if (destLower.includes('taller')) {
+        updates.ubicacion = 'Taller'; updates.habitacion = ''; updates.piso = '';
+      } else if (destLower.includes('almacén') || destLower.includes('almacen')) {
+        updates.ubicacion = 'Almacen'; updates.habitacion = ''; updates.piso = '';
+      } else if (destLower.includes('habitacion') || destLower.includes('hab.') || /\bhab\.?\s*\d+/i.test(destino)) {
+        const habMatch = destino.match(/hab\.?\s*(\d+)/i);
+        updates.ubicacion = 'Habitacion';
+        updates.habitacion = habMatch ? habMatch[1] : '';
+      } else {
+        updates.ubicacion = destino || 'Otro';
+        updates.habitacion = '';
       }
-      if (tipo === 'otro') {
-        updates.estado = 'activo';
-        const destLower = (destino || '').toLowerCase();
-        if (destLower.includes('taller')) {
-          updates.ubicacion = 'Taller'; updates.habitacion = ''; updates.piso = '';
-        } else if (destLower.includes('almacén') || destLower.includes('almacen')) {
-          updates.ubicacion = 'Almacen'; updates.habitacion = ''; updates.piso = '';
-        } else if (destLower.includes('habitacion') || destLower.includes('hab.') || /\bhab\.?\s*\d+/i.test(destino)) {
-          const habMatch = destino.match(/hab\.?\s*(\d+)/i);
-          updates.ubicacion = 'Habitacion';
-          updates.habitacion = habMatch ? habMatch[1] : '';
-        } else {
-          updates.ubicacion = destino || 'Otro';
-          updates.habitacion = '';
-        }
-      }
-      if (Object.keys(updates).length > 0) {
-        await db.collection('tvs').doc(tvId).update(updates);
-      }
+    }
+    if (Object.keys(updates).length > 0) {
+      await db.collection('tvs').doc(tvId).update(updates);
     }
 
     showToast('El movimiento de TV fue guardado con éxito.', 'success', 4000);
@@ -3432,14 +3429,7 @@ document.getElementById('btnConfirmAsignar').addEventListener('click', async () 
   if (tvCheck) {
     const ubCheck = (tvCheck.ubicacion || '').toLowerCase();
     if (ubCheck === 'taller') {
-      showToast(`⚠️ El TV [${tvCheck.codigo}] se encuentra en el TALLER. No puede ser asignado hasta que regrese a Almacén.`, 'error');
-      closeModal('modalAsignar');
-      return;
-    }
-    if (tvCheck.ubicacion && tvCheck.ubicacion !== 'Almacen' && tvCheck.ubicacion !== 'Almacén') {
-      showToast(`El TV [${tvCheck.codigo}] ya no está en Almacén. Ubicación actual: ${tvCheck.ubicacion}.`, 'error');
-      closeModal('modalAsignar');
-      return;
+      showToast(`⚠️ El TV [${tvCheck.codigo}] se encuentra en el TALLER. Será reubicado automáticamente.`, 'info');
     }
   }
 
