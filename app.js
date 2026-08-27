@@ -653,7 +653,7 @@ function renderInventario(filtroEstado = '', filtroUbicacion = '', busqueda = ''
       <td style="font-size:0.78rem">${fmtDateOnly(t.fechaIngreso)}</td>
       <td>
         <div class="actions-cell">
-          <button class="btn btn-assign btn-sm" title="Asignar a habitación" onclick="abrirAsignarHabitacion('${t.id}')" ${(t.ubicacion === 'Habitacion' || (t.ubicacion || '').toLowerCase() === 'taller') ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>🏨 Asignar</button>
+          <button class="btn btn-assign btn-sm" title="Asignar a habitación" onclick="abrirAsignarHabitacion('${t.id}')" ${(t.ubicacion && t.ubicacion !== 'Almacen' && t.ubicacion !== 'Almacén') ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>🏨 Asignar</button>
           <button class="btn btn-secondary btn-sm" onclick="editarTV('${t.id}')" title="Editar datos del TV">✏️ Editar</button>
           ${hasPermission('cambiar_serial') ? `<button class="btn btn-secondary btn-sm" onclick="abrirCambioSerial('${t.id}')" title="Modificar serial del TV" style="background:rgba(179,110,255,0.15); border-color:rgba(179,110,255,0.4); color:#b36eff;">🔑 Serial</button>` : ''}
           <button class="btn btn-danger btn-sm" onclick="confirmarEliminar('${t.id}')" title="Ocultar registro">🗑️ Eliminar</button>
@@ -3139,8 +3139,10 @@ document.getElementById('formMovimiento').addEventListener('submit', async e => 
   if (tipo === 'traslado_hab') {
     destino = `Hab. ${habDestino}`;
   }
-  if (!tipo || !responsable || !motivo || !origen) {
-    showToast('Completa todos los campos obligatorios.', 'error'); return;
+  if (!tipo || !responsable || !motivo || !origen || !destino) {
+    if (!destino) showToast('Selecciona o ingresa el destino.', 'error');
+    else showToast('Completa todos los campos obligatorios.', 'error');
+    return;
   }
 
   const btnSubmit = e.target.querySelector('button[type="submit"]');
