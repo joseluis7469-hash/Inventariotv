@@ -2484,96 +2484,44 @@ const elMovDestinoHab = document.getElementById('movDestinoHab');
 if (elMovDestinoHab) {
   elMovDestinoHab.addEventListener('input', function() {
     adjustMovDestinoHabWidth();
-    const habVal = this.value.trim();
-    const aviso = document.getElementById('movDestinoHabAviso');
-    if (!habVal) {
-      aviso.style.display = 'none';
-      return;
-    }
-    if (!isValidRoom(habVal)) {
-      aviso.textContent = `La habitación ${habVal} no es válida.`;
-      aviso.style.display = 'block';
-      return;
-    }
-    const tvs = loadTVs();
-    const exist = tvs.find(t => 
-      t.estado === 'activo' && 
-      ((t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') && t.habitacion === habVal) || 
-      (t.ubicacion === habVal)
-    );
-    
-    if (exist) {
-      const selTipo = document.getElementById('movTipo');
-      if (selTipo && (selTipo.value === 'reingreso' || selTipo.value === 'traslado_hab' || selTipo.value === 'entrada_taller')) {
-        mostrarModalReubicarTV(exist, habVal, function(tvReem, tipoReem, destinoReem) {
-          window._tvReemplazo = { id: tvReem.id, codigo: tvReem.codigo, marca: tvReem.marca, modelo: tvReem.modelo, tamano: tvReem.tamano, serial: tvReem.serial, destino: destinoReem, ubicacion: tvReem.ubicacion, habitacion: tvReem.habitacion };
-          window._tvReemplazoTipo = tipoReem;
-          if (selTipo.value === 'reingreso') {
-            const destSelect = document.getElementById('movDestinoSelect');
-            const movDestino = document.getElementById('movDestino');
-            const area = destSelect ? destSelect.value : '';
-            if (destSelect) destSelect.style.display = 'none';
-            if (movDestino) {
-              movDestino.style.display = '';
-              movDestino.value = area ? `${area} - Hab. ${habVal}` : '';
-              movDestino.readOnly = true;
-            }
-          }
-          const nextField = document.getElementById('movFecha');
-          if (nextField) nextField.focus();
-        });
-      } else {
-        showAlertaHabitacion(habVal, exist);
-      }
-      aviso.style.display = 'none';
-      const nextField = document.getElementById('movFecha');
-      if (nextField) nextField.focus();
-    } else {
-      aviso.style.display = 'none';
-      const selTipo = document.getElementById('movTipo');
-      const destSelect = document.getElementById('movDestinoSelect');
-      const movDestino = document.getElementById('movDestino');
-      if (selTipo && selTipo.value === 'reingreso' && destSelect) {
-        const area = destSelect.value;
-        if (destSelect) destSelect.style.display = 'none';
-        if (movDestino) {
-          movDestino.style.display = '';
-          movDestino.value = area ? `${area} - Hab. ${habVal}` : '';
-          movDestino.readOnly = true;
-        }
-      } else if (selTipo && selTipo.value === 'traslado_hab') {
-        if (movDestino) movDestino.value = `Hab. ${habVal}`;
-      }
-      const nextField = document.getElementById('movFecha');
-      if (nextField) nextField.focus();
-    }
   });
 
   elMovDestinoHab.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') {
       e.preventDefault();
       const habVal = this.value.trim();
-      if (!habVal || !isValidRoom(habVal)) return;
+      if (!habVal || !isValidRoom(habVal)) {
+        showToast(`La habitación ${habVal} no es válida.`, 'error');
+        return;
+      }
       const tvs = loadTVs();
-      // Buscar TVs activos en habitación: revisar tanto ubicacion='Habitacion' con habitacion como ubicacion directa
-      const exist = tvs.find(t => 
-        t.estado === 'activo' && 
-        ((t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') && t.habitacion === habVal) || 
+      const exist = tvs.find(t =>
+        t.estado === 'activo' &&
+        ((t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') && t.habitacion === habVal) ||
         (t.ubicacion === habVal));
+      const movDestino = document.getElementById('movDestino');
+      const grp = document.getElementById('grpMovDestinoHab');
       if (exist) {
-        document.getElementById('reemplazoInfo').textContent = `La habitación ${habVal} ya tiene el TV [${exist.codigo}] ${exist.marca} ${exist.modelo || ''}.`;
-        document.getElementById('reemplazoOtroGroup').style.display = 'none';
-        document.getElementById('reemplazoOtroInput').value = '';
-        const grpTallerEstado = document.getElementById('reemplazoTallerEstadoGroup');
-        if (grpTallerEstado) {
-          grpTallerEstado.style.display = 'none';
-          document.getElementById('reemplazoTallerEstado').value = 'inoperativo';
+        const selTipo = document.getElementById('movTipo');
+        mostrarModalReubicarTV(exist, habVal, function(tvReem, tipoReem, destinoReem) {
+          window._tvReemplazo = { id: tvReem.id, codigo: tvReem.codigo, marca: tvReem.marca, modelo: tvReem.modelo, tamano: tvReem.tamano, serial: tvReem.serial, destino: destinoReem, ubicacion: tvReem.ubicacion, habitacion: tvReem.habitacion };
+          window._tvReemplazoTipo = tipoReem;
+          if (movDestino) {
+            movDestino.value = `Hab. ${habVal}`;
+            movDestino.readOnly = true;
+          }
+          if (grp) grp.style.display = 'none';
+          const nextField = document.getElementById('movFecha');
+          if (nextField) nextField.focus();
+        });
+      } else {
+        if (movDestino) {
+          movDestino.value = `Hab. ${habVal}`;
+          movDestino.readOnly = true;
         }
-        window._reemplazoSeleccion = null;
-        document.querySelectorAll('#modalReemplazo .btn').forEach(b => b.style.borderColor = '');
-        window._tvReemplazoData = { id: exist.id, codigo: exist.codigo, marca: exist.marca, modelo: exist.modelo || '', tamano: exist.tamano || '', serial: exist.serial, ubicacion: exist.ubicacion, habitacion: exist.habitacion || '' };
-        window._resolveReemplazo = null;
-        openModal('modalReemplazo');
+        if (grp) grp.style.display = 'none';
+        const nextField = document.getElementById('movFecha');
+        if (nextField) nextField.focus();
       }
     }
   });
