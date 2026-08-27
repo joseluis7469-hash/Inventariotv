@@ -2375,10 +2375,8 @@ if (btn.dataset.val === 'entrada_taller') {
       if (destSelect) {
         destSelect.style.display = '';
         renderMovDestinoSelect();
-        mostrarModalNuevaArea(function(areaCreada) {
-          renderMovDestinoSelect();
-          destSelect.value = areaCreada;
-        });
+        destSelect.value = '';
+        destSelect.focus();
       }
     } else {
       if (destSelect) destSelect.style.display = 'none';
@@ -2502,10 +2500,9 @@ if (document.getElementById('movDestinoSelect')) {
       const areaDestino = this.value;
       const tvs = loadTVs();
       const tvEnArea = tvs.find(t =>
-        t.ubicacion === areaDestino &&
-        (!t.habitacion || t.habitacion === '') &&
+        t.ubicacion && t.ubicacion.toLowerCase() === areaDestino.toLowerCase() &&
         t.estado !== 'baja' &&
-        String(t.id) !== String(document.getElementById('movTvSelect')?.value || '')
+        String(t.id) !== String(document.getElementById('movTV')?.value || '')
       );
       if (tvEnArea) {
         showAlertaArea(areaDestino, tvEnArea);
