@@ -3018,7 +3018,10 @@ function resetFormMovimiento() {
   if (grp) grp.style.display = 'none';
   const aviso = document.getElementById('movDestinoHabAviso');
   if (aviso) aviso.style.display = 'none';
-  document.querySelectorAll('.mov-tipo-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelectorAll('.mov-tipo-btn').forEach(b => {
+    b.classList.remove('selected');
+    b.classList.remove('locked');
+  });
   _movUpdateTVCard(null);
 
   const btnContainer = document.getElementById('movActaContainer');
@@ -3026,12 +3029,23 @@ function resetFormMovimiento() {
 
   const destInput = document.getElementById('movDestino');
   const destSelect = document.getElementById('movDestinoSelect');
-  if (destSelect) destSelect.style.display = 'none';
-  if (destInput) destInput.style.display = '';
+  if (destSelect) { destSelect.style.display = 'none'; destSelect.value = ''; }
+  if (destInput) {
+    destInput.style.display = '';
+    destInput.value = '';
+    destInput.removeAttribute('readonly');
+    destInput.readOnly = false;
+  }
+
+  const grpTvSaliente = document.getElementById('grpMovTvSaliente');
+  if (grpTvSaliente) grpTvSaliente.style.display = 'none';
+
+  window._tvReemplazo = null;
+  window._tvReemplazoTipo = null;
+  window._tvReemplazoEstado = null;
 
   document.querySelectorAll('.mov-resp-input').forEach(i => i.value = '');
 
-  // Limpiar también el campo de búsqueda global al resetear el formulario de movimiento
   const searchInput = document.getElementById('searchInventario');
   if (searchInput) {
     searchInput.value = '';
