@@ -3091,6 +3091,15 @@ document.getElementById('formMovimiento').addEventListener('submit', async e => 
     if (!destino) {
       showToast('Selecciona el área de destino.', 'error'); return;
     }
+    const destinoLimpio = (destino || '').trim().toUpperCase();
+    const origenLimpio = (origen || '').trim().toUpperCase();
+    if (origenLimpio && destinoLimpio && (
+      (origenLimpio.includes('TALLER') && destinoLimpio.includes('TALLER')) ||
+      (origenLimpio === destinoLimpio)
+    )) {
+      showToast('El origen y el destino no pueden ser el mismo lugar. Verifica los datos.', 'error');
+      return;
+    }
   }
   let habDestino = '';
 
@@ -3140,6 +3149,37 @@ document.getElementById('formMovimiento').addEventListener('submit', async e => 
         return;
       }
       destino = `${destino} - Hab. ${habDestino}`;
+    }
+  }
+
+  if (tipo === 'entrada_taller') {
+    const destinoLimpio = (destino || '').replace(/[-\s]*Hab\.\s*\d+/gi, '').trim().toUpperCase();
+    const origenLimpio = (origen || '').trim().toUpperCase();
+    if (origenLimpio && destinoLimpio && (
+      (origenLimpio.includes('TALLER') && destinoLimpio.includes('TALLER')) ||
+      (origenLimpio === destinoLimpio)
+    )) {
+      showToast('El origen y el destino no pueden ser el mismo lugar. Verifica los datos.', 'error');
+      return;
+    }
+  }
+
+  if (tipo === 'reingreso') {
+    const destinoLimpio = (destino || '').replace(/[-\s]*Hab\.\s*\d+/gi, '').trim().toUpperCase();
+    const origenLimpio = (origen || '').trim().toUpperCase();
+    if (origenLimpio && destinoLimpio && (
+      (origenLimpio.includes('TALLER') && destinoLimpio.includes('TALLER')) ||
+      (origenLimpio === destinoLimpio)
+    )) {
+      showToast('El origen y el destino no pueden ser el mismo lugar. Verifica los datos.', 'error');
+      return;
+    }
+  }
+
+  if (tipo === 'traslado_hab') {
+    if (origen && habDestino && origen.trim() === habDestino.trim()) {
+      showToast('El origen y el destino no pueden ser la misma habitación.', 'error');
+      return;
     }
   }
 
