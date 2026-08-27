@@ -185,7 +185,6 @@ const tipoLabel = {
   traslado_hab:   '🔀 Traslado habitación',
   entrada_taller: '🔧 Enviado a taller',
   baja:           '❌ Dado de baja',
-  reingreso:      '🔄 Salida del Taller',
   otro:           '📝 Otro',
   tv_creado:      '➕ TV registrado',
   tv_editado:     '✏️ TV editado',
@@ -807,7 +806,7 @@ function verDetalle(id) {
 
 function tipoIcon(tipo) {
   const icons = { traslado_hab:'🔀', entrada_taller:'🔧', retorno_taller:'✅',
-                  baja:'❌', reingreso:'🔄', otro:'📝' };
+                  baja:'❌', otro:'📝' };
   return icons[tipo] || '📝';
 }
 
@@ -2147,7 +2146,6 @@ function populateMovTV() {
       <option value="">-- Seleccionar --</option>
       <option value="traslado_hab">HABITACION</option>
       <option value="entrada_taller">TALLER</option>
-      <option value="reingreso">SALIDA DEL TALLER</option>
       <option value="baja">DE BAJA</option>
       <option value="otro">OTROS</option>
     `;
@@ -2330,13 +2328,6 @@ if (btn.dataset.val === 'entrada_taller') {
       }
       document.getElementById('movTallerEstado').value = 'inoperativo';
     }
-      if (btn.dataset.val === 'reingreso') {
-        const origenSelect = document.getElementById('movOrigen');
-        if (origenSelect) {
-          origenSelect.value = 'Taller';
-          origenSelect.disabled = true;
-        }
-      }
     }
 
     const destInput = document.getElementById('movDestino');
@@ -2351,14 +2342,6 @@ if (btn.dataset.val === 'entrada_taller') {
           renderMovDestinoSelect();
           destSelect.value = areaCreada;
         });
-      }
-    } else if (btn.dataset.val === 'reingreso') {
-      if (destInput) destInput.style.display = 'none';
-      if (destSelect) {
-        destSelect.style.display = '';
-        renderMovDestinoSelect();
-        destSelect.value = '';
-        setTimeout(() => destSelect.focus(), 100);
       }
     } else {
       if (destSelect) destSelect.style.display = 'none';
@@ -2441,7 +2424,7 @@ if (document.getElementById('movDestinoSelect')) {
     const selTipo = document.getElementById('movTipo');
     const grp = document.getElementById('grpMovDestinoHab');
     const val = (this.value || '').toLowerCase();
-    if (selTipo && selTipo.value === 'reingreso' && (val.includes('premium') || val.includes('anillo'))) {
+    if (selTipo && (selTipo.value === 'traslado_hab') && (val.includes('premium') || val.includes('anillo'))) {
       grp.style.display = '';
       const habInput = document.getElementById('movDestinoHab');
       const habList = document.getElementById('movDestinoHabList');
@@ -2452,7 +2435,7 @@ if (document.getElementById('movDestinoSelect')) {
         habInput.disabled = false;
         habInput.focus();
       }
-    } else if (selTipo && selTipo.value === 'reingreso') {
+    } else if (selTipo && selTipo.value === 'entrada_taller') {
       grp.style.display = 'none';
       const movDestino = document.getElementById('movDestino');
       const destSelect = document.getElementById('movDestinoSelect');
@@ -2595,9 +2578,6 @@ function textoProcedimientoActivo(mov, tv) {
     case 'baja':
       return `${base}<br>
       <strong>Procedimiento de Baja de Activo:</strong> Se procede a dar de baja el televisor del inventario activo del HPA, quedando excluido del parque tecnológico. Se registran las razones de la baja y se deja constancia del retiro del equipo del servicio.`;
-    case 'reingreso':
-      return `${base}<br>
-      <strong>Procedimiento de Salida del Taller:</strong> El televisor fue recibido del Taller de Reparaciones del HPA una vez concluida su reparación y verificación técnica. Se procede a reasignarlo a la ubicación de destino (${destino}), quedando nuevamente disponible y operativo en el inventario activo del hotel.`;
     case 'traslado_hab':
       return `${base}<br>
       <strong>Procedimiento de Traslado de Activo:</strong> Se retira el televisor de su ubicación de origen (${origen}) y se traslada a la habitación ${destino}. El equipo es instalado y verificado en la habitación designada, quedando en servicio.${mov.tvReemplazo ? `<br>
@@ -2638,14 +2618,6 @@ function imprimirActaActual() {
   if (selTipo === 'traslado_hab') {
     const hab = get('movDestinoHab');
     destino = hab ? `Hab. ${hab}` : destino;
-  }
-  if (selTipo === 'reingreso') {
-    const destSelEl = document.getElementById('movDestinoSelect');
-    if (destSelEl && destSelEl.style.display !== 'none') {
-      destino = get('movDestinoSelect') || destino;
-    } else {
-      destino = get('movDestino') || destino;
-    }
   }
 
   const motivo = get('movMotivo') || 'Sin descripción';
@@ -3123,48 +3095,7 @@ document.getElementById('formMovimiento').addEventListener('submit', async e => 
     }
   }
 
-  if (tipo === 'reingreso') {
-    const destSelectEl = document.getElementById('movDestinoSelect');
-    const destInputEl = document.getElementById('movDestino');
-    if (destSelectEl && destSelectEl.style.display !== 'none') {
-      destino = get('movDestinoSelect');
-    } else if (destInputEl) {
-      destino = get('movDestino');
-    }
-    if (!destino) {
-      showToast('Selecciona el área de destino.', 'error'); return;
-    }
-    const valArea = (destino || '').toLowerCase();
-    if (valArea.includes('premium') || valArea.includes('anillo')) {
-      habDestino = get('movDestinoHab');
-      if (!habDestino) {
-        showToast('Ingresa el número de habitación destino.', 'error'); return;
-      }
-      if (!isValidRoom(habDestino)) {
-        showToast(`La habitación ${habDestino} no es válida.`, 'error'); return;
-      }
-      const exist = tvs.find(t => t.estado === 'activo' && (t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') && t.habitacion === habDestino && String(t.id) !== String(tvId));
-      if (exist) {
-        showToast(`La habitación ${habDestino} ya tiene el TV [${exist.codigo}]. Use el botón de movimiento para reubicar.`, 'error');
-        return;
-      }
-      destino = `${destino} - Hab. ${habDestino}`;
-    }
-  }
-
   if (tipo === 'entrada_taller') {
-    const destinoLimpio = (destino || '').replace(/[-\s]*Hab\.\s*\d+/gi, '').trim().toUpperCase();
-    const origenLimpio = (origen || '').trim().toUpperCase();
-    if (origenLimpio && destinoLimpio && (
-      (origenLimpio.includes('TALLER') && destinoLimpio.includes('TALLER')) ||
-      (origenLimpio === destinoLimpio)
-    )) {
-      showToast('El origen y el destino no pueden ser el mismo lugar. Verifica los datos.', 'error');
-      return;
-    }
-  }
-
-  if (tipo === 'reingreso') {
     const destinoLimpio = (destino || '').replace(/[-\s]*Hab\.\s*\d+/gi, '').trim().toUpperCase();
     const origenLimpio = (origen || '').trim().toUpperCase();
     if (origenLimpio && destinoLimpio && (
@@ -3200,10 +3131,7 @@ document.getElementById('formMovimiento').addEventListener('submit', async e => 
 
   try {
     let pisoDestino = '';
-    if (tipo === 'reingreso' && habDestino) {
-      const destSelEl = document.getElementById('movDestinoSelect');
-      pisoDestino = (destSelEl && destSelEl.style.display !== 'none') ? get('movDestinoSelect') : (destino.split(' - ')[0] || '');
-    } else if (tipo === 'traslado_hab' && habDestino) {
+    if (tipo === 'traslado_hab' && habDestino) {
       pisoDestino = get('movDestinoSelect') || get('asignarArea') || '';
     }
     const mov = {
@@ -3242,19 +3170,6 @@ document.getElementById('formMovimiento').addEventListener('submit', async e => 
       const updates = {};
       if (tipo === 'entrada_taller')  { updates.estado = 'taller'; updates.tallerEstado = document.getElementById('movTallerEstado').value || 'inoperativo'; updates.ubicacion = 'Taller'; updates.habitacion = ''; updates.piso = ''; }
       if (tipo === 'baja')            updates.estado = 'baja';
-      if (tipo === 'reingreso')       {
-        updates.estado = 'activo';
-        updates.tallerEstado = '';
-        if (mov.habDestino) {
-          updates.ubicacion = 'Habitacion';
-          updates.habitacion = mov.habDestino;
-          updates.piso = mov.pisoDestino || '';
-        } else {
-          updates.ubicacion = 'Almacen';
-          updates.habitacion = '';
-          updates.piso = '';
-        }
-      }
       if (tipo === 'traslado_hab')    {
         updates.estado = 'activo';
         if (mov.habDestino) { updates.ubicacion = 'Habitacion'; updates.habitacion = mov.habDestino; if (mov.pisoDestino || tv.piso) updates.piso = mov.pisoDestino || tv.piso; }
