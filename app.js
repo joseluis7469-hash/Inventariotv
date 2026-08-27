@@ -221,6 +221,62 @@ function showAlertaHabitacion(hab, tv) {
   openModal('modalAlertaHab');
 }
 
+let _reubicarTvData = null;
+let _reubicarSeleccion = null;
+let _reubicarCallback = null;
+
+function mostrarModalReubicarTV(tv, hab, callback) {
+  _reubicarTvData = { tv, hab };
+  _reubicarSeleccion = null;
+  _reubicarCallback = callback;
+  document.getElementById('reubicarTVInfo').innerHTML = `⚠️ La habitación <strong>${hab}</strong> ya tiene el TV [<strong>${tv.codigo}</strong>] ${tv.marca} ${tv.modelo || ''}.`;
+  document.getElementById('reubicarOtroGroup').style.display = 'none';
+  document.getElementById('reubicarOtroInput').value = '';
+  const btnConfirm = document.getElementById('btnConfirmarReubicacion');
+  if (btnConfirm) btnConfirm.disabled = true;
+  document.querySelectorAll('.reubicar-btn').forEach(b => b.style.borderColor = '');
+  openModal('modalReubicarTV');
+}
+
+function seleccionarReubicacion(tipo) {
+  _reubicarSeleccion = tipo;
+  document.querySelectorAll('.reubicar-btn').forEach(b => b.style.borderColor = '');
+  event.currentTarget.style.borderColor = 'var(--accent)';
+  const otroGroup = document.getElementById('reubicarOtroGroup');
+  if (tipo === 'otro') {
+    otroGroup.style.display = '';
+    document.getElementById('reubicarOtroInput').focus();
+  } else {
+    otroGroup.style.display = 'none';
+  }
+  const btnConfirm = document.getElementById('btnConfirmarReubicacion');
+  if (btnConfirm) btnConfirm.disabled = false;
+}
+
+function confirmarReubicacion() {
+  if (!_reubicarSeleccion || !_reubicarTvData) return;
+  let destino = _reubicarSeleccion;
+  if (destino === 'otro') {
+    destino = document.getElementById('reubicarOtroInput').value.trim();
+    if (!destino) {
+      showToast('Especifica el destino del TV.', 'error');
+      return;
+    }
+  }
+  closeModal('modalReubicarTV');
+  if (_reubicarCallback) {
+    _reubicarCallback(_reubicarTvData.tv, _reubicarSeleccion, destino);
+    _reubicarCallback = null;
+  }
+}
+
+function cancelarReubicarTV() {
+  closeModal('modalReubicarTV');
+  _reubicarTvData = null;
+  _reubicarSeleccion = null;
+  _reubicarCallback = null;
+}
+
 let _nuevaAreaCallback = null;
 
 function mostrarModalNuevaArea(callback) {
@@ -2419,20 +2475,29 @@ if (elMovDestinoHab) {
     );
     
     if (exist) {
-      showAlertaHabitacion(habVal, exist);
-      aviso.style.display = 'none';
       const selTipo = document.getElementById('movTipo');
-      if (selTipo && selTipo.value === 'reingreso') {
-        const destSelect = document.getElementById('movDestinoSelect');
-        const movDestino = document.getElementById('movDestino');
-        const area = destSelect ? destSelect.value : '';
-        if (destSelect) destSelect.style.display = 'none';
-        if (movDestino) {
-          movDestino.style.display = '';
-          movDestino.value = area ? `${area} - Hab. ${habVal}` : '';
-          movDestino.readOnly = true;
-        }
+      if (selTipo && (selTipo.value === 'reingreso' || selTipo.value === 'traslado_hab' || selTipo.value === 'entrada_taller')) {
+        mostrarModalReubicarTV(exist, habVal, function(tvReem, tipoReem, destinoReem) {
+          window._tvReemplazo = { id: tvReem.id, codigo: tvReem.codigo, marca: tvReem.marca, modelo: tvReem.modelo, tamano: tvReem.tamano, serial: tvReem.serial, destino: destinoReem, ubicacion: tvReem.ubicacion, habitacion: tvReem.habitacion };
+          window._tvReemplazoTipo = tipoReem;
+          if (selTipo.value === 'reingreso') {
+            const destSelect = document.getElementById('movDestinoSelect');
+            const movDestino = document.getElementById('movDestino');
+            const area = destSelect ? destSelect.value : '';
+            if (destSelect) destSelect.style.display = 'none';
+            if (movDestino) {
+              movDestino.style.display = '';
+              movDestino.value = area ? `${area} - Hab. ${habVal}` : '';
+              movDestino.readOnly = true;
+            }
+          }
+          const nextField = document.getElementById('movFecha');
+          if (nextField) nextField.focus();
+        });
+      } else {
+        showAlertaHabitacion(habVal, exist);
       }
+      aviso.style.display = 'none';
       const nextField = document.getElementById('movFecha');
       if (nextField) nextField.focus();
     } else {
@@ -3063,7 +3128,7 @@ document.getElementById('formMovimiento').addEventListener('submit', async e => 
       }
       const exist = tvs.find(t => t.estado === 'activo' && (t.ubicacion === 'Habitacion' || t.ubicacion === 'Habitación') && t.habitacion === habDestino && String(t.id) !== String(tvId));
       if (exist) {
-        showAlertaHabitacion(habDestino, exist);
+        showToast(`La habitación ${habDestino} ya tiene el TV [${exist.codigo}]. Use el botón de movimiento para reubicar.`, 'error');
         return;
       }
       destino = `${destino} - Hab. ${habDestino}`;
