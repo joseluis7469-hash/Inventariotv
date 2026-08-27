@@ -470,36 +470,27 @@ document.querySelectorAll('.modal-overlay').forEach(o => {
 // Cerrar modales con tecla Escape
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    const searchInput = document.getElementById('searchInventario');
-    // Si el usuario está escribiendo en el campo de búsqueda, limpiarlo
-    if (searchInput && document.activeElement === searchInput) {
-      searchInput.value = '';
-      searchInput.blur();
-      applyInventarioFilters();
-      return;
-    }
-    // Si hay modales abiertos, cerrarlos y limpiar el campo de búsqueda
-    const openModals = document.querySelectorAll('.modal-overlay.open');
-    if (openModals.length) {
-      // Limpiar campo de búsqueda al cerrar cualquier modal
-      if (searchInput) {
-        searchInput.value = '';
-        applyInventarioFilters();
-      }
-      const last = openModals[openModals.length - 1];
-      last.classList.remove('open');
-      if (last.id === 'modalZoom') {
+    const active = document.activeElement;
+    const isOpenModal = document.querySelector('.modal-overlay.open');
+    if (isOpenModal) {
+      isOpenModal.classList.remove('open');
+      if (isOpenModal.id === 'modalZoom') {
         const img = document.getElementById('zoomImgSource');
         if (img) { img.style.transition = 'transform 0.3s'; img.style.transform = 'scale(0.95)'; }
       }
       if (_lastFocusedElement) { _lastFocusedElement.focus(); _lastFocusedElement = null; }
-    } else {
-      // Si no hay modales abiertos pero el usuario sale de la búsqueda avanzada,
-      // asegurar que el campo esté limpio
-      if (searchInput) {
-        searchInput.value = '';
-        applyInventarioFilters();
-      }
+      return;
+    }
+    if (active && ['INPUT', 'TEXTAREA'].includes(active.tagName) && !active.readOnly && !active.disabled) {
+      e.preventDefault();
+      active.value = '';
+      active.dispatchEvent(new Event('input', { bubbles: true }));
+      return;
+    }
+    const searchInput = document.getElementById('searchInventario');
+    if (searchInput) {
+      searchInput.value = '';
+      applyInventarioFilters();
     }
   }
 });
