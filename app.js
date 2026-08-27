@@ -283,7 +283,7 @@ function confirmarReubicacion() {
   const estado = estadoSel ? estadoSel.value : 'activo';
 
   const tv = _reubicarTvData.tv;
-  document.getElementById('tvSalienteInfo').textContent = `${tv.codigo} — ${tv.marca} ${tv.modelo || ''}`.trim();
+  document.getElementById('tvSalienteInfo').textContent = `${tv.codigo} — ${tv.marca} ${tv.serial || ''}`.trim();
   document.getElementById('tvSalienteDestino').textContent = destinoLabel;
   
   let estadoLabel;
