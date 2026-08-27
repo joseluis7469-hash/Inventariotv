@@ -343,11 +343,16 @@ function confirmarNuevaArea() {
     showToast('Ingresa un nombre para el área.', 'error');
     return;
   }
+  const areasFijas = ['Premium 68', 'Premium 69', 'Anillo 1', 'Anillo 2', 'Anillo 3'];
   const custom = loadAreas();
-  if (!custom.includes(valor)) {
-    custom.push(valor);
-    saveAreas(custom);
+  const todas = [...areasFijas, ...custom];
+  const existe = todas.some(a => a.toLowerCase() === valor.toLowerCase());
+  if (existe) {
+    showToast(`El área "${valor}" ya existe.`, 'error');
+    return;
   }
+  custom.push(valor);
+  saveAreas(custom);
   closeModal('modalNuevaArea');
   if (_nuevaAreaCallback) {
     _nuevaAreaCallback(valor);
