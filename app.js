@@ -256,13 +256,35 @@ function seleccionarReubicacion(tipo) {
 function confirmarReubicacion() {
   if (!_reubicarSeleccion || !_reubicarTvData) return;
   let destino = _reubicarSeleccion;
-  if (destino === 'otro') {
+  let destinoLabel = '';
+  if (destino === 'taller') {
+    destinoLabel = 'Taller';
+  } else if (destino === 'almacen') {
+    destinoLabel = 'Almacén';
+  } else if (destino === 'baja') {
+    destinoLabel = 'Baja';
+  } else if (destino === 'otro') {
     destino = document.getElementById('reubicarOtroInput').value.trim();
     if (!destino) {
       showToast('Especifica el destino del TV.', 'error');
       return;
     }
+    destinoLabel = destino;
   }
+
+  const tv = _reubicarTvData.tv;
+  document.getElementById('tvSalienteInfo').textContent = `${tv.codigo} — ${tv.marca} ${tv.modelo || ''}`.trim();
+  document.getElementById('tvSalienteDestino').textContent = destinoLabel;
+  const estadoMap = {
+    taller: 'En Taller (para reparación)',
+    almacen: 'En Almacén',
+    baja: 'Dado de Baja',
+    otro: destinoLabel
+  };
+  document.getElementById('tvSalienteEstado').textContent = estadoMap[_reubicarSeleccion] || destinoLabel;
+  const grp = document.getElementById('grpMovTvSaliente');
+  if (grp) grp.style.display = '';
+
   closeModal('modalReubicarTV');
   if (_reubicarCallback) {
     _reubicarCallback(_reubicarTvData.tv, _reubicarSeleccion, destino);
@@ -2228,6 +2250,9 @@ if (document.getElementById('movTV')) {
     const tvs = loadTVs();
     const tv = tvs.find(t => String(t.id) === String(val));
     
+    const grpTvSaliente = document.getElementById('grpMovTvSaliente');
+    if (grpTvSaliente) grpTvSaliente.style.display = 'none';
+    
     const origenSelect = document.getElementById('movOrigen');
     
     if (tv) {
@@ -2257,6 +2282,9 @@ document.querySelectorAll('.mov-tipo-btn').forEach(btn => {
     btn.classList.add('locked');
     const sel = document.getElementById('movTipo');
     if (sel) sel.value = btn.dataset.val;
+
+    const grpTvSaliente = document.getElementById('grpMovTvSaliente');
+    if (grpTvSaliente) grpTvSaliente.style.display = 'none';
 
     const grpMovTaller = document.getElementById('grpMovTallerEstado');
     if (grpMovTaller) {
