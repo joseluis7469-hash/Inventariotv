@@ -623,6 +623,11 @@ function renderDashboard() {
 }
 
 // ─── INVENTARIO ──────────────────────────────────────────────
+function isInventarioAsignable(ubicacion) {
+  const u = (ubicacion || '').trim().toLowerCase();
+  return u === 'almacen' || u === 'almacén' || u === '';
+}
+
 function renderInventario(filtroEstado = '', filtroUbicacion = '', busqueda = '') {
   let tvs = loadTVs();
 
@@ -653,7 +658,7 @@ function renderInventario(filtroEstado = '', filtroUbicacion = '', busqueda = ''
       <td style="font-size:0.78rem">${fmtDateOnly(t.fechaIngreso)}</td>
       <td>
         <div class="actions-cell">
-          <button class="btn btn-assign btn-sm" title="Asignar a habitación" onclick="abrirAsignarHabitacion('${t.id}')" ${(() => { const u = (t.ubicacion || '').trim().toLowerCase(); return (u === 'almacen' || u === 'almacén' || u === '') ? '' : 'disabled style="opacity:0.5;cursor:not-allowed;"'; })()}>🏨 Asignar</button>
+          <button class="btn btn-assign btn-sm" title="Asignar a habitación" onclick="abrirAsignarHabitacion('${t.id}')" ${isInventarioAsignable(t.ubicacion) ? '' : 'disabled'}>🏨 Asignar</button>
           <button class="btn btn-secondary btn-sm" onclick="editarTV('${t.id}')" title="Editar datos del TV">✏️ Editar</button>
           ${hasPermission('cambiar_serial') ? `<button class="btn btn-secondary btn-sm" onclick="abrirCambioSerial('${t.id}')" title="Modificar serial del TV" style="background:rgba(179,110,255,0.15); border-color:rgba(179,110,255,0.4); color:#b36eff;">🔑 Serial</button>` : ''}
           <button class="btn btn-danger btn-sm" onclick="confirmarEliminar('${t.id}')" title="Ocultar registro">🗑️ Eliminar</button>

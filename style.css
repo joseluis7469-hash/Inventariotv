@@ -1230,9 +1230,12 @@ textarea { resize: vertical; min-height: 80px; }
   box-shadow: 0 4px 18px rgba(0,245,160,0.5);
 }
 .btn-assign:disabled {
-  background: rgba(255,255,255,0.08);
-  color: rgba(255,255,255,0.3);
-  box-shadow: none;
+  background: rgba(255,255,255,0.08) !important;
+  color: rgba(255,255,255,0.3) !important;
+  box-shadow: none !important;
+  pointer-events: none;
+  transform: none !important;
+}
   transform: none;
 }
 
