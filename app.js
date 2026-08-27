@@ -286,13 +286,26 @@ function confirmarReubicacion() {
   const tv = _reubicarTvData.tv;
   document.getElementById('tvSalienteInfo').textContent = `${tv.codigo} — ${tv.marca} ${tv.modelo || ''}`.trim();
   document.getElementById('tvSalienteDestino').textContent = destinoLabel;
-  const estadoMap = {
-    taller: 'En Taller (para reparación)',
-    almacen: 'En Almacén',
-    baja: 'Dado de Baja',
-    otro: destinoLabel
-  };
-  document.getElementById('tvSalienteEstado').textContent = estadoMap[_reubicarSeleccion] || destinoLabel;
+  
+  let estadoLabel;
+  if (estado === 'operativo') {
+    const estadoDestinoMap = {
+      taller: 'Operativo - En Taller',
+      almacen: 'Operativo - En Almacén',
+      baja: 'Operativo - Dado de Baja',
+      otro: `Operativo - ${destinoLabel}`
+    };
+    estadoLabel = estadoDestinoMap[_reubicarSeleccion] || `Operativo - ${destinoLabel}`;
+  } else {
+    const estadoDestinoMap = {
+      taller: 'Inoperativo para revisión - En Taller',
+      almacen: 'Inoperativo para revisión - En Almacén',
+      baja: 'Inoperativo para revisión - Dado de Baja',
+      otro: `Inoperativo para revisión - ${destinoLabel}`
+    };
+    estadoLabel = estadoDestinoMap[_reubicarSeleccion] || `Inoperativo para revisión - ${destinoLabel}`;
+  }
+  document.getElementById('tvSalienteEstado').textContent = estadoLabel;
   const grp = document.getElementById('grpMovTvSaliente');
   if (grp) grp.style.display = '';
 
@@ -2506,7 +2519,9 @@ if (elMovDestinoHab) {
           const destSelect = document.getElementById('movDestinoSelect');
           const grp = document.getElementById('grpMovDestinoHab');
           const area = destSelect ? destSelect.value : '';
+          if (destSelect) destSelect.style.display = 'none';
           if (movDestino) {
+            movDestino.style.display = '';
             movDestino.value = area ? `${area} - Hab. ${habVal}` : `Hab. ${habVal}`;
             movDestino.readOnly = true;
           }
@@ -2531,7 +2546,9 @@ if (elMovDestinoHab) {
       const destSelect = document.getElementById('movDestinoSelect');
       const grp = document.getElementById('grpMovDestinoHab');
       const area = destSelect ? destSelect.value : '';
+      if (destSelect) destSelect.style.display = 'none';
       if (movDestino) {
+        movDestino.style.display = '';
         movDestino.value = area ? `${area} - Hab. ${habVal}` : `Hab. ${habVal}`;
         movDestino.readOnly = true;
       }
