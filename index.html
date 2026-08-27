@@ -1096,51 +1096,47 @@
 
   <!-- MODAL: REUBICAR TV EXISTENTE (Solo Movimientos) -->
   <div class="modal-overlay" id="modalReubicarTV">
-    <div class="modal modal-sm" style="max-width: 480px;">
-      <div class="modal-header" style="background: linear-gradient(135deg, rgba(99,179,237,0.15), rgba(99,179,237,0.05)); border-bottom: 1px solid rgba(99,179,237,0.3);">
-        <h3 style="color: var(--accent);">📦 Reubicar TV Existente</h3>
-        <button class="modal-close" onclick="cancelarReubicarTV()">✕</button>
+    <div class="modal modal-sm" style="max-width: 440px;">
+      <div class="modal-header" style="background: linear-gradient(135deg, rgba(99,179,237,0.15), rgba(99,179,237,0.05)); border-bottom: 1px solid rgba(99,179,237,0.3); padding: 0.7rem 1rem;">
+        <h3 style="color: var(--accent); font-size: 0.95rem;">📦 Reubicar TV Existente</h3>
+        <button class="modal-close" onclick="cancelarReubicarTV()" style="font-size: 1.1rem;">✕</button>
       </div>
-      <div class="modal-body" style="padding: 1.5rem;">
-        <div id="reubicarTVInfo" style="background: rgba(255,193,7,0.1); border: 1px solid rgba(255,193,7,0.3); border-radius: var(--radius-sm); padding: 0.8rem 1rem; margin-bottom: 1.2rem; color: var(--text-primary); font-size: 0.9rem;">
+      <div class="modal-body" style="padding: 0.8rem 1rem;">
+        <div id="reubicarTVInfo" style="background: rgba(255,193,7,0.1); border: 1px solid rgba(255,193,7,0.3); border-radius: var(--radius-sm); padding: 0.5rem 0.7rem; margin-bottom: 0.6rem; color: var(--text-primary); font-size: 0.78rem;">
         </div>
-        <p style="font-weight: 600; color: var(--text-primary); margin-bottom: 1rem;">¿A dónde se reubica este TV?</p>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.2rem;">
-          <button onclick="seleccionarReubicacion('taller')" class="reubicar-btn" style="padding: 1rem; background: linear-gradient(135deg, rgba(255,152,0,0.15), rgba(255,152,0,0.05)); border: 1.5px solid rgba(255,152,0,0.4); border-radius: var(--radius-sm); cursor: pointer; text-align: left; transition: var(--transition);" onmouseover="this.style.borderColor='#ff9800'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='rgba(255,152,0,0.4)'; this.style.transform='none'">
-            <div style="font-size: 1.5rem; margin-bottom: 0.3rem;">🔧</div>
-            <div style="font-weight: 700; color: #ff9800; font-size: 0.95rem;">Taller</div>
-            <div style="font-size: 0.75rem; color: var(--text-secondary);">Envío a reparación</div>
+        <p style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem; font-size: 0.82rem;">¿A dónde se reubica este TV?</p>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; margin-bottom: 0.5rem;">
+          <button onclick="seleccionarReubicacion('taller')" class="reubicar-btn" style="padding: 0.5rem; background: linear-gradient(135deg, rgba(255,152,0,0.15), rgba(255,152,0,0.05)); border: 1.5px solid rgba(255,152,0,0.4); border-radius: var(--radius-sm); cursor: pointer; text-align: left; transition: var(--transition);" onmouseover="this.style.borderColor='#ff9800'" onmouseout="this.style.borderColor='rgba(255,152,0,0.4)'">
+            <div style="font-weight: 700; color: #ff9800; font-size: 0.78rem;">🔧 Taller</div>
+            <div style="font-size: 0.62rem; color: var(--text-secondary);">Envío a reparación</div>
           </button>
-          <button onclick="seleccionarReubicacion('almacen')" class="reubicar-btn" style="padding: 1rem; background: linear-gradient(135deg, rgba(76,175,80,0.15), rgba(76,175,80,0.05)); border: 1.5px solid rgba(76,175,80,0.4); border-radius: var(--radius-sm); cursor: pointer; text-align: left; transition: var(--transition);" onmouseover="this.style.borderColor='#4caf50'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='rgba(76,175,80,0.4)'; this.style.transform='none'">
-            <div style="font-size: 1.5rem; margin-bottom: 0.3rem;">📦</div>
-            <div style="font-weight: 700; color: #4caf50; font-size: 0.95rem;">Almacén</div>
-            <div style="font-size: 0.75rem; color: var(--text-secondary);">Guardado en inventario</div>
+          <button onclick="seleccionarReubicacion('almacen')" class="reubicar-btn" style="padding: 0.5rem; background: linear-gradient(135deg, rgba(76,175,80,0.15), rgba(76,175,80,0.05)); border: 1.5px solid rgba(76,175,80,0.4); border-radius: var(--radius-sm); cursor: pointer; text-align: left; transition: var(--transition);" onmouseover="this.style.borderColor='#4caf50'" onmouseout="this.style.borderColor='rgba(76,175,80,0.4)'">
+            <div style="font-weight: 700; color: #4caf50; font-size: 0.78rem;">📦 Almacén</div>
+            <div style="font-size: 0.62rem; color: var(--text-secondary);">Guardado en inventario</div>
           </button>
-          <button onclick="seleccionarReubicacion('baja')" class="reubicar-btn" style="padding: 1rem; background: linear-gradient(135deg, rgba(244,67,54,0.15), rgba(244,67,54,0.05)); border: 1.5px solid rgba(244,67,54,0.4); border-radius: var(--radius-sm); cursor: pointer; text-align: left; transition: var(--transition);" onmouseover="this.style.borderColor='#f44336'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='rgba(244,67,54,0.4)'; this.style.transform='none'">
-            <div style="font-size: 1.5rem; margin-bottom: 0.3rem;">❌</div>
-            <div style="font-weight: 700; color: #f44336; font-size: 0.95rem;">Dado de Baja</div>
-            <div style="font-size: 0.75rem; color: var(--text-secondary);">Retiro del servicio</div>
+          <button onclick="seleccionarReubicacion('baja')" class="reubicar-btn" style="padding: 0.5rem; background: linear-gradient(135deg, rgba(244,67,54,0.15), rgba(244,67,54,0.05)); border: 1.5px solid rgba(244,67,54,0.4); border-radius: var(--radius-sm); cursor: pointer; text-align: left; transition: var(--transition);" onmouseover="this.style.borderColor='#f44336'" onmouseout="this.style.borderColor='rgba(244,67,54,0.4)'">
+            <div style="font-weight: 700; color: #f44336; font-size: 0.78rem;">❌ Dado de Baja</div>
+            <div style="font-size: 0.62rem; color: var(--text-secondary);">Retiro del servicio</div>
           </button>
-          <button onclick="seleccionarReubicacion('otro')" class="reubicar-btn" style="padding: 1rem; background: linear-gradient(135deg, rgba(99,179,237,0.15), rgba(99,179,237,0.05)); border: 1.5px solid rgba(99,179,237,0.4); border-radius: var(--radius-sm); cursor: pointer; text-align: left; transition: var(--transition);" onmouseover="this.style.borderColor='var(--accent)'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='rgba(99,179,237,0.4)'; this.style.transform='none'">
-            <div style="font-size: 1.5rem; margin-bottom: 0.3rem;">📝</div>
-            <div style="font-weight: 700; color: var(--accent); font-size: 0.95rem;">Otro</div>
-            <div style="font-size: 0.75rem; color: var(--text-secondary);">Especificar destino</div>
+          <button onclick="seleccionarReubicacion('otro')" class="reubicar-btn" style="padding: 0.5rem; background: linear-gradient(135deg, rgba(99,179,237,0.15), rgba(99,179,237,0.05)); border: 1.5px solid rgba(99,179,237,0.4); border-radius: var(--radius-sm); cursor: pointer; text-align: left; transition: var(--transition);" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='rgba(99,179,237,0.4)'">
+            <div style="font-weight: 700; color: var(--accent); font-size: 0.78rem;">📝 Otro</div>
+            <div style="font-size: 0.62rem; color: var(--text-secondary);">Especificar destino</div>
           </button>
         </div>
-        <div id="reubicarOtroGroup" style="display:none; margin-bottom: 1rem;">
-          <label style="display: block; margin-bottom: 0.4rem; font-weight: 600; font-size: 0.85rem; color: var(--text-primary);">Especificar destino:</label>
-          <input type="text" id="reubicarOtroInput" placeholder="Ingrese el destino..." style="width: 100%; padding: 0.6rem 0.8rem; background: var(--bg-card); border: 1.5px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.85rem;" />
+        <div id="reubicarOtroGroup" style="display:none; margin-bottom: 0.5rem;">
+          <label style="display: block; margin-bottom: 0.25rem; font-weight: 600; font-size: 0.72rem; color: var(--text-primary);">Especificar destino:</label>
+          <input type="text" id="reubicarOtroInput" placeholder="Ingrese el destino..." style="width: 100%; padding: 0.45rem 0.6rem; background: var(--bg-card); border: 1.5px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.78rem;" />
         </div>
-        <div style="margin-bottom: 1.2rem;">
-          <label style="display: block; margin-bottom: 0.4rem; font-weight: 600; font-size: 0.85rem; color: var(--text-primary);">Estado del TV a reubicar:</label>
-          <select id="reubicarEstado" style="width: 100%; padding: 0.6rem 0.8rem; background: var(--bg-card); border: 1.5px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.85rem;">
+        <div id="reubicarEstadoGroup" style="display:none; margin-bottom: 0.6rem; padding: 0.5rem 0.7rem; background: linear-gradient(135deg, rgba(156,39,176,0.25), rgba(156,39,176,0.08)); border: 1.5px solid rgba(156,39,176,0.5); border-radius: var(--radius-sm);">
+          <label style="display: block; margin-bottom: 0.25rem; font-weight: 600; font-size: 0.72rem; color: #ce93d8;">Estado del TV a reubicar:</label>
+          <select id="reubicarEstado" style="width: 100%; padding: 0.45rem 0.6rem; background: var(--bg-card); border: 1.5px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.78rem;">
             <option value="inoperativo" selected>Inoperativo</option>
             <option value="operativo">Operativo</option>
           </select>
         </div>
-        <div style="display: flex; gap: 0.75rem;">
-          <button onclick="cancelarReubicarTV()" style="flex: 1; padding: 0.7rem; background: transparent; border: 1.5px solid var(--border); border-radius: var(--radius-sm); color: var(--text-secondary); font-weight: 600; cursor: pointer;">Cancelar</button>
-          <button id="btnConfirmarReubicacion" onclick="confirmarReubicacion()" disabled style="flex: 1; padding: 0.7rem; background: linear-gradient(135deg, var(--accent), #63b3ed); border: none; border-radius: var(--radius-sm); color: #fff; font-weight: 600; cursor: pointer; opacity: 0.5;">Confirmar</button>
+        <div style="display: flex; gap: 0.5rem; border-top: 1px solid var(--border); padding-top: 0.6rem;">
+          <button onclick="cancelarReubicarTV()" style="flex: 1; padding: 0.55rem; background: transparent; border: 1.5px solid var(--border); border-radius: var(--radius-sm); color: var(--text-secondary); font-weight: 600; font-size: 0.78rem; cursor: pointer;">Cancelar</button>
+          <button id="btnConfirmarReubicacion" onclick="confirmarReubicacion()" disabled style="flex: 1; padding: 0.55rem; background: linear-gradient(135deg, var(--accent), #63b3ed); border: none; border-radius: var(--radius-sm); color: #fff; font-weight: 600; font-size: 0.78rem; cursor: pointer; opacity: 0.5;">Confirmar</button>
         </div>
       </div>
     </div>

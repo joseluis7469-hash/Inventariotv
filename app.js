@@ -232,6 +232,8 @@ function mostrarModalReubicarTV(tv, hab, callback) {
   document.getElementById('reubicarTVInfo').innerHTML = `⚠️ La habitación <strong>${hab}</strong> ya tiene el TV [<strong>${tv.codigo}</strong>] ${tv.marca} ${tv.modelo || ''}.`;
   document.getElementById('reubicarOtroGroup').style.display = 'none';
   document.getElementById('reubicarOtroInput').value = '';
+  const estadoGroup = document.getElementById('reubicarEstadoGroup');
+  if (estadoGroup) estadoGroup.style.display = 'none';
   const estadoSel = document.getElementById('reubicarEstado');
   if (estadoSel) estadoSel.value = 'inoperativo';
   const btnConfirm = document.getElementById('btnConfirmarReubicacion');
@@ -245,12 +247,16 @@ function seleccionarReubicacion(tipo) {
   document.querySelectorAll('.reubicar-btn').forEach(b => b.style.borderColor = '');
   event.currentTarget.style.borderColor = 'var(--accent)';
   const otroGroup = document.getElementById('reubicarOtroGroup');
+  const estadoGroup = document.getElementById('reubicarEstadoGroup');
   if (tipo === 'otro') {
     otroGroup.style.display = '';
     document.getElementById('reubicarOtroInput').focus();
   } else {
     otroGroup.style.display = 'none';
   }
+  if (estadoGroup) estadoGroup.style.display = '';
+  const estadoSel = document.getElementById('reubicarEstado');
+  if (estadoSel) estadoSel.value = 'inoperativo';
   const btnConfirm = document.getElementById('btnConfirmarReubicacion');
   if (btnConfirm) btnConfirm.disabled = false;
 }
