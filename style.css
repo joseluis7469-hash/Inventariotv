@@ -521,9 +521,23 @@ textarea {
   padding: 0.65rem 0.85rem;
   outline: none;
   transition: var(--transition);
-  width: auto;
+  width: 100%;
   max-width: 100%;
-  field-sizing: content;
+  field-sizing: fixed;
+  text-align: center;
+  text-align-last: center;
+}
+
+#movTV {
+  width: 100%;
+  padding: 0.7rem 1rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  text-align-last: center;
 }
 
 .form-group.full-width input,
