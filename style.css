@@ -436,9 +436,9 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   align-items: center;
   justify-content: space-between;
   padding: 0.65rem 0.85rem;
-  background: linear-gradient(135deg, rgba(15,23,42,0.8), rgba(30,41,59,0.8));
+  background: rgba(0,0,0,0.25);
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.15);
   font-size: 0.82rem;
   gap: 0.5rem;
   transition: var(--transition);
@@ -525,10 +525,6 @@ textarea {
   max-width: 100%;
   field-sizing: content;
 }
-
-select option { background: #0a1e42; color: #e0e8f0; padding: 0.5rem; }
-select option:hover { background: rgba(0,212,255,0.15); }
-select option:checked { background: rgba(0,212,255,0.25); color: #ffffff; }
 
 .form-group.full-width input,
 .form-group.full-width select,
@@ -804,8 +800,8 @@ textarea { resize: vertical; min-height: 80px; }
   justify-content: center;
   gap: 0.4rem;
   padding: 1rem 0.6rem;
-  background: linear-gradient(135deg, rgba(15,23,42,0.9), rgba(30,41,59,0.9));
-  border: 1.5px solid rgba(255,255,255,0.15);
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: var(--transition);
@@ -1294,10 +1290,10 @@ textarea { resize: vertical; min-height: 80px; }
 }
 
 .data-table tbody tr:nth-child(even) td {
-  background: rgba(255,255,255,0.02);
+  background: rgba(255,255,255,0.03);
 }
 .data-table tbody tr:nth-child(odd) td {
-  background: rgba(255,255,255,0.04);
+  background: rgba(255,255,255,0.05);
 }
 
 .data-table tbody tr:last-child td { border-bottom: none; }
