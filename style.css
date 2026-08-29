@@ -1236,8 +1236,6 @@ textarea { resize: vertical; min-height: 80px; }
   pointer-events: none;
   transform: none !important;
 }
-  transform: none;
-}
 
 /* ---------- TABLE ---------- */
 .table-wrapper {
