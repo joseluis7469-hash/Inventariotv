@@ -3243,31 +3243,42 @@ document.getElementById('formMovimiento').addEventListener('submit', async e => 
 
     // Actualizar estado del TV en Firestore directamente
     const updates = {};
-    if (tipo === 'entrada_taller')  { updates.estado = 'taller'; updates.tallerEstado = document.getElementById('movTallerEstado').value || 'inoperativo'; updates.ubicacion = 'Taller'; updates.habitacion = ''; updates.piso = ''; }
-    if (tipo === 'baja')            { updates.estado = 'baja'; updates.ubicacion = 'Baja'; updates.habitacion = ''; updates.piso = ''; }
-    if (tipo === 'traslado_hab')    {
-      updates.estado = 'activo';
-      if (mov.habDestino) { updates.ubicacion = 'Habitacion'; updates.habitacion = mov.habDestino; if (mov.pisoDestino) updates.piso = mov.pisoDestino; }
-    }
-    if (tipo === 'otro') {
-      updates.estado = 'activo';
+    updates.estado = 'activo';
+    updates.habitacion = '';
+
+    if (tipo === 'entrada_taller') {
+      updates.estado = 'taller';
+      updates.tallerEstado = document.getElementById('movTallerEstado').value || 'inoperativo';
+      updates.ubicacion = 'Taller';
+      updates.piso = '';
+    } else if (tipo === 'baja') {
+      updates.estado = 'baja';
+      updates.ubicacion = 'Baja';
+      updates.piso = '';
+    } else if (tipo === 'traslado_hab') {
+      updates.ubicacion = 'Habitacion';
+      updates.habitacion = mov.habDestino || '';
+      updates.piso = mov.pisoDestino || '';
+    } else if (tipo === 'otro') {
       const destLower = (destino || '').toLowerCase();
+      updates.piso = '';
       if (destLower.includes('taller')) {
-        updates.ubicacion = 'Taller'; updates.habitacion = ''; updates.piso = '';
+        updates.ubicacion = 'Taller';
       } else if (destLower.includes('almacén') || destLower.includes('almacen')) {
-        updates.ubicacion = 'Almacen'; updates.habitacion = ''; updates.piso = '';
+        updates.ubicacion = 'Almacen';
       } else if (destLower.includes('habitacion') || destLower.includes('hab.') || /\bhab\.?\s*\d+/i.test(destino)) {
         const habMatch = destino.match(/hab\.?\s*(\d+)/i);
         updates.ubicacion = 'Habitacion';
         updates.habitacion = habMatch ? habMatch[1] : '';
       } else {
         updates.ubicacion = destino || 'Otro';
-        updates.habitacion = '';
       }
+    } else {
+      updates.ubicacion = destino || 'Otro';
+      updates.piso = '';
     }
-    if (Object.keys(updates).length > 0) {
-      await db.collection('tvs').doc(tvId).update(updates);
-    }
+
+    await db.collection('tvs').doc(tvId).update(updates);
 
     showToast('El movimiento de TV fue guardado con éxito.', 'success', 4000);
     setTimeout(() => imprimirActaFromData(mov, tv), 4000);
