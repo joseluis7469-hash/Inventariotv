@@ -242,7 +242,19 @@ function reubicarTvDesdeAlerta() {
   if (!_alertaAreaData) return;
   const { area, tv } = _alertaAreaData;
   closeModal('modalAlertaHab');
-  mostrarModalReubicarTV(tv, area, function(seleccion, destinoFinal, estado) {
+  mostrarModalReubicarTV(tv, area, function(tvData, seleccion, destino, estado) {
+    window._tvReemplazo = {
+      id: tvData.id,
+      codigo: tvData.codigo,
+      marca: tvData.marca,
+      modelo: tvData.modelo,
+      tamano: tvData.tamano,
+      serial: tvData.serial,
+      destino: destino,
+      ubicacion: tvData.ubicacion,
+      habitacion: tvData.habitacion,
+      tallerEstado: estado
+    };
     _alertaAreaData = null;
   });
 }
@@ -3209,12 +3221,13 @@ document.getElementById('formMovimiento').addEventListener('submit', async e => 
     // Reubicar TV existente si hubo reemplazo
     if (window._tvReemplazo) {
       const reemp = window._tvReemplazo;
-      const reempUpdates = { ubicacion: 'Habitacion' };
+      const reempUpdates = {};
       if (/^\d+$/.test(reemp.destino)) {
+        reempUpdates.ubicacion = 'Habitacion';
         reempUpdates.habitacion = reemp.destino;
       } else {
         reempUpdates.habitacion = '';
-        reempUpdates.ubicacion = reemp.destino;
+        reempUpdates.ubicacion = reemp.destino || reemp.ubicacion || 'Almacen';
         if (reemp.destino.toLowerCase().includes('taller')) {
           reempUpdates.estado = 'taller';
           reempUpdates.tallerEstado = reemp.tallerEstado || 'inoperativo';
