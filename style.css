@@ -618,48 +618,62 @@ textarea { resize: vertical; min-height: 80px; }
   display: flex;
   align-items: center;
   gap: 0.85rem;
-  padding-bottom: 0.9rem;
-  border-bottom: 1px solid var(--border);
+  padding-bottom: 1rem;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 0.2rem;
 }
 
 .mov-panel-icon {
-  font-size: 2.2rem;
-  filter: drop-shadow(0 0 12px rgba(99,179,237,0.6));
+  font-size: 2.4rem;
+  filter: drop-shadow(0 0 14px rgba(99,179,237,0.7));
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
 }
 
 .mov-panel-title {
-  font-size: 1.25rem;
+  font-size: 1.2rem;
   font-weight: 800;
-  color: #000000;
+  color: #ffffff;
   letter-spacing: 0.02em;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.4);
 }
 
 .mov-panel-sub {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
+  font-size: 0.8rem;
+  color: var(--text-muted);
   font-weight: 500;
-  margin-top: 0.2rem;
+  margin-top: 0.25rem;
 }
 
 /* ── Bloques de campo ── */
-.mov-field-block { display: flex; flex-direction: column; gap: 0.4rem; }
+.mov-field-block { 
+  display: flex; 
+  flex-direction: column; 
+  gap: 0.5rem; 
+  padding: 0.4rem 0;
+}
 .mov-field-block select { width: 100%; field-sizing: fixed; }
 
 .mov-field-label {
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--accent);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
 }
 
 /* ── Tarjeta de TV seleccionado ── */
 .mov-tv-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
+  background: linear-gradient(135deg, rgba(15,23,42,0.95), rgba(30,41,59,0.95));
+  border: 1px solid rgba(0,212,255,0.25);
   border-radius: var(--radius-sm);
   overflow: hidden;
   animation: fadeIn 0.3s ease;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05);
 }
 
 .mov-tv-img-wrap {
@@ -719,13 +733,14 @@ textarea { resize: vertical; min-height: 80px; }
 
 .mov-tv-info-label {
   display: block;
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   font-weight: 700;
-  color: var(--accent-hover);
+  color: var(--accent);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   line-height: 1;
-  margin-bottom: 0.15rem;
+  margin-bottom: 0.2rem;
+  opacity: 0.8;
 }
 
 .mov-tv-info-val {
@@ -747,24 +762,25 @@ textarea { resize: vertical; min-height: 80px; }
   align-items: center;
   justify-content: center;
   gap: 0.75rem;
-  padding: 2rem 1rem;
-  background: var(--bg-surface);
-  border: 1px dashed var(--border);
+  padding: 2.5rem 1rem;
+  background: linear-gradient(135deg, rgba(15,23,42,0.6), rgba(30,41,59,0.6));
+  border: 2px dashed rgba(0,212,255,0.2);
   border-radius: var(--radius-sm);
   text-align: center;
   animation: fadeIn 0.3s ease;
 }
 
 .mov-tv-placeholder-icon {
-  font-size: 2.5rem;
-  opacity: 0.3;
-  filter: grayscale(1);
+  font-size: 3rem;
+  opacity: 0.25;
+  filter: grayscale(0.5);
 }
 
 .mov-tv-placeholder p {
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   color: var(--text-muted);
-  line-height: 1.5;
+  line-height: 1.6;
+  font-weight: 500;
 }
 
 /* ── Secciones del panel derecho ── */
