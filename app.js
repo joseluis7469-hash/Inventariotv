@@ -4070,3 +4070,13 @@ document.addEventListener('keydown', e => {
 })();
 
 showPage('dashboard');
+
+// ─── TEMP: Mover HPA-074 a Taller ──────────────────────────
+window.mover074 = async function() {
+  const snap = await db.collection('tvs').where('codigo', '==', 'HPA-074').get();
+  for (const doc of snap.docs) {
+    await doc.ref.update({ ubicacion: 'Taller', estado: 'taller', habitacion: '', piso: '' });
+    console.log('✅ HPA-074 movido a Taller');
+  }
+  renderInventario();
+};
