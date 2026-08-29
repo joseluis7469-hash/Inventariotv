@@ -538,6 +538,26 @@ textarea {
   text-overflow: ellipsis;
   text-align: center;
   text-align-last: center;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: none;
+  padding-right: 2rem;
+}
+
+#movTV option {
+  text-align: center;
+  text-align-last: center;
+  white-space: normal;
+  padding: 0.5rem;
+}
+
+.mov-field-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #000000;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
 }
 
 .form-group.full-width input,
@@ -671,14 +691,6 @@ textarea { resize: vertical; min-height: 80px; }
   padding: 0.4rem 0;
 }
 .mov-field-block select { width: 100%; field-sizing: fixed; }
-
-.mov-field-label {
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: var(--accent);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
 
 /* ── Tarjeta de TV seleccionado ── */
 .mov-tv-card {
