@@ -1284,21 +1284,14 @@ textarea { resize: vertical; min-height: 80px; }
 .data-table td {
   padding: 0.7rem 0.8rem;
   border-bottom: 1px solid rgba(255,255,255,0.06);
-  color: #e0e8f0;
+  color: #ffffff;
   vertical-align: middle;
   white-space: nowrap;
 }
 
-.data-table tbody tr:nth-child(even) td {
-  background: rgba(255,255,255,0.03);
-}
-.data-table tbody tr:nth-child(odd) td {
-  background: rgba(255,255,255,0.05);
-}
-
 .data-table tbody tr:last-child td { border-bottom: none; }
 .data-table tbody tr { transition: background 0.2s ease, box-shadow 0.2s ease; cursor: pointer; outline: none; }
-.data-table tbody tr:hover { background: rgba(0,212,255,0.10); }
+.data-table tbody tr:hover { background: rgba(0,212,255,0.07); }
 
 /* ── Fila activa / seleccionada ── */
 .data-table tbody tr.tr-selected,
