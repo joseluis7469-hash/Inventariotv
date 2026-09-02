@@ -410,7 +410,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 .card-body { padding: 1rem 1.25rem; }
 
 #dash-movimientos {
-  max-height: 450px;
+  max-height: 520px;
   overflow-y: auto;
   padding-right: 0.5rem;
 }
@@ -420,7 +420,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 #dash-movimientos::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
 #dash-taller {
-  max-height: 450px;
+  max-height: 520px;
   overflow-y: auto;
   padding-right: 0.5rem;
 }
