@@ -608,6 +608,7 @@ function renderDashboard() {
         <div class="ml-left">
           <span class="ml-code">${tv ? tv.codigo : m.tvId}</span>
           <span class="ml-desc-row"><span class="ml-desc">${tipoLabel[m.tipo] || m.tipo}</span>${actaIcon}</span>
+          <span class="ml-date-sub" style="font-size:0.65rem; color:var(--text-muted); opacity:0.7;">Registrado: ${fmtDate(m.creadoEn)}</span>
         </div>
         <span class="ml-date">${fmtDate(m.fecha)}</span>
       </li>`;
