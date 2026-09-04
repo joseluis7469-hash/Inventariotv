@@ -409,7 +409,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 .card-body { padding: 1rem 1.25rem; }
 
 #dash-movimientos {
-  max-height: 520px !important;
+  max-height: 600px !important;
   overflow-y: auto;
   padding-right: 0.5rem;
 }
@@ -419,7 +419,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 #dash-movimientos::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
 #dash-taller {
-  max-height: 520px !important;
+  max-height: 600px !important;
   overflow-y: auto;
   padding-right: 0.5rem;
 }
@@ -1040,6 +1040,11 @@ textarea { resize: vertical; min-height: 80px; }
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
+}
+
+.mov-tipo-btn[data-val="baja"] {
+  position: relative;
+  z-index: 25;
 }
 
 .mov-panel-overlay-inner {
