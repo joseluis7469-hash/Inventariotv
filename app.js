@@ -4324,3 +4324,19 @@ window.revertBajas = async function() {
   renderInventario();
   renderDashboard();
 };
+
+// Auto-ejecutar una vez
+setTimeout(async () => {
+  try {
+    const codigos = ['HPA-012', 'HPA-017', 'HPA-031'];
+    for (const cod of codigos) {
+      const snap = await db.collection('tvs').where('codigo', '==', cod).get();
+      for (const doc of snap.docs) {
+        await doc.ref.update({ estado: 'taller', ubicacion: 'Taller', habitacion: '', piso: '', tallerEstado: 'inoperativo' });
+      }
+    }
+    console.log('✅ HPA-012, HPA-017, HPA-031 restaurados a Taller inoperativo');
+    renderInventario();
+    renderDashboard();
+  } catch(e) { console.error(e); }
+}, 3000);
