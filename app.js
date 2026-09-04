@@ -4334,6 +4334,15 @@ setTimeout(async () => {
       for (const doc of snap.docs) {
         await doc.ref.update({ estado: 'taller', ubicacion: 'Taller', habitacion: '', piso: '', tallerEstado: 'inoperativo' });
       }
+      const movSnap = await db.collection('movimientos').where('tipo', '==', 'baja').get();
+      for (const movDoc of movSnap.docs) {
+        const tvId = movDoc.data().tvId;
+        const tvSnap = await db.collection('tvs').doc(tvId).get();
+        if (tvSnap.exists && tvSnap.data().codigo === cod) {
+          await movDoc.ref.delete();
+          console.log('🗑️ Movimiento de baja eliminado para', cod);
+        }
+      }
     }
     console.log('✅ HPA-012, HPA-017, HPA-031 restaurados a Taller inoperativo');
     renderInventario();
