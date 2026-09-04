@@ -553,7 +553,7 @@ textarea {
 .mov-field-label {
   font-size: 0.82rem;
   font-weight: 700;
-  color: #000000;
+  color: #ffffff;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -2318,7 +2318,7 @@ textarea { resize: vertical; min-height: 80px; }
   padding: 0.85rem 1rem;
 }
 #reemplazoTallerEstadoGroup .mov-field-label,
-#reemplazoOtroGroup .mov-field-label { color: #0a1e42; }
+#reemplazoOtroGroup .mov-field-label { color: #ffffff; }
 #reemplazoTallerEstado { padding: 0.6rem 0.8rem; }
 #modalReemplazo select,
 #modalReemplazo input[type="text"],
