@@ -4310,3 +4310,17 @@ async function confirmarBajaMultiple() {
 })();
 
 showPage('dashboard');
+
+// ─── TEMP: Revertir bajas HPA-012, HPA-017, HPA-031 ────────
+window.revertBajas = async function() {
+  const codigos = ['HPA-012', 'HPA-017', 'HPA-031'];
+  for (const cod of codigos) {
+    const snap = await db.collection('tvs').where('codigo', '==', cod).get();
+    for (const doc of snap.docs) {
+      await doc.ref.update({ estado: 'activo', ubicacion: 'Almacen', habitacion: '', piso: '', tallerEstado: '' });
+      console.log('✅', cod, 'restaurado a Almacén');
+    }
+  }
+  renderInventario();
+  renderDashboard();
+};
