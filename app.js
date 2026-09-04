@@ -4320,9 +4320,9 @@ async function confirmarBajaMultiple() {
   const overlay = document.getElementById('movPanelOverlay');
   if (overlay) overlay.classList.add('hidden');
 
-  // Focus en responsable
-  const respInput = document.querySelector('.mov-resp-input');
-  if (respInput) respInput.focus();
+  // Focus en campo fecha para continuar llenando
+  const fechaInput = document.getElementById('movFecha');
+  if (fechaInput) fechaInput.focus();
 
   showToast(`${tvsSeleccionados.length} TV(s) seleccionado(s). Completa los datos y presiona Registrar.`, 'info', 4000);
 }
