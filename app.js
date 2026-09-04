@@ -4317,8 +4317,8 @@ window.revertBajas = async function() {
   for (const cod of codigos) {
     const snap = await db.collection('tvs').where('codigo', '==', cod).get();
     for (const doc of snap.docs) {
-      await doc.ref.update({ estado: 'activo', ubicacion: 'Almacen', habitacion: '', piso: '', tallerEstado: '' });
-      console.log('✅', cod, 'restaurado a Almacén');
+      await doc.ref.update({ estado: 'taller', ubicacion: 'Taller', habitacion: '', piso: '', tallerEstado: 'inoperativo' });
+      console.log('✅', cod, 'restaurado a Taller inoperativo');
     }
   }
   renderInventario();
