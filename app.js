@@ -3303,7 +3303,9 @@ document.getElementById('formMovimiento').addEventListener('submit', async e => 
     }
   }
 
-  if (!tvId) {
+  if (tipo === 'baja' && _bajaSeleccionados.length) {
+    // Baja múltiple: omitir validación de tvId individual
+  } else if (!tvId) {
     showToast('Seleccione un TV válido de la lista.', 'error'); return;
   }
   if (tipo === 'traslado_hab') {
@@ -3325,6 +3327,50 @@ document.getElementById('formMovimiento').addEventListener('submit', async e => 
     if (tipo === 'traslado_hab' && habDestino) {
       pisoDestino = get('movDestinoSelect') || get('asignarArea') || '';
     }
+
+    // BAJA MÚLTIPLE
+    if (tipo === 'baja' && _bajaSeleccionados.length) {
+      const tvsAll = loadTVs();
+      const tvsGrupo = [];
+      let count = 0;
+
+      for (const selId of _bajaSeleccionados) {
+        const tv = tvsAll.find(t => String(t.id) === String(selId));
+        if (!tv) continue;
+
+        const movBaja = {
+          id: uid(), tvId: selId, tipo: 'baja', fecha, responsable, motivo,
+          origen: tv.ubicacion || 'Taller', destino: 'Baja', habDestino: '', pisoDestino: '',
+          creadoEn: new Date().toISOString()
+        };
+        await db.collection('movimientos').doc(movBaja.id).set(movBaja);
+
+        await db.collection('tvs').doc(selId).update({
+          estado: 'baja', ubicacion: 'Baja', habitacion: '', piso: ''
+        });
+
+        tvsGrupo.push({ id: tv.id, codigo: tv.codigo, marca: tv.marca, modelo: tv.modelo, serial: tv.serial, tamano: tv.tamano });
+        count++;
+      }
+
+      showToast(`${count} TV(s) dado(s) de baja correctamente. ✅`, 'success', 5000);
+      renderInventario();
+      renderDashboard();
+      resetFormMovimiento();
+
+      if (tvsGrupo.length) {
+        const movGrupal = {
+          id: uid(), tvId: tvsGrupo[0].id, tipo: 'baja', fecha, responsable, motivo,
+          origen: 'Taller', destino: 'Baja', habDestino: '', pisoDestino: '', tvsGrupo
+        };
+        setTimeout(() => imprimirActaBajaMultiple(movGrupal, tvsGrupo.map(g => tvsAll.find(t => t.id === g.id)).filter(Boolean)), 1500);
+      }
+
+      _bajaSeleccionados = [];
+      return;
+    }
+
+    // MOVIMIENTO NORMAL (un solo TV)
     const mov = {
       id: uid(), tvId, tipo, fecha, responsable, motivo, origen, destino, habDestino, pisoDestino,
       tvReemplazo: window._tvReemplazo || null,
@@ -4236,69 +4282,49 @@ function actualizarBajaSeleccion() {
 
 async function confirmarBajaMultiple() {
   if (!_bajaSeleccionados.length) return;
-  const btnConfirm = document.getElementById('btnBajaMultipleConfirm');
-  const prevText = btnConfirm.textContent;
-  btnConfirm.textContent = 'Procesando...';
-  btnConfirm.disabled = true;
 
-  try {
-    const tvs = loadTVs();
-    const responsable = prompt('Nombre del responsable que autoriza la baja:') || 'Sin especificar';
-    const motivo = prompt('Motivo de la baja:') || 'Baja por inoperatividad en Taller';
-    const fecha = new Date().toISOString();
-    let count = 0;
+  const tvs = loadTVs();
+  const tvsSeleccionados = _bajaSeleccionados.map(id => tvs.find(t => String(t.id) === String(id))).filter(Boolean);
 
-    for (const tvId of _bajaSeleccionados) {
-      const tv = tvs.find(t => String(t.id) === String(tvId));
-      if (!tv) continue;
+  closeModal('modalBajaMultiple');
 
-      const mov = {
-        id: uid(),
-        tvId: tvId,
-        tipo: 'baja',
-        fecha: fecha,
-        responsable: responsable,
-        motivo: motivo,
-        origen: 'Taller',
-        destino: 'Baja',
-        habDestino: '',
-        pisoDestino: '',
-        creadoEn: new Date().toISOString()
-      };
-      await db.collection('movimientos').doc(mov.id).set(mov);
-
-      await db.collection('tvs').doc(tvId).update({
-        estado: 'baja',
-        ubicacion: 'Baja',
-        habitacion: '',
-        piso: ''
-      });
-      count++;
-    }
-
-    closeModal('modalBajaMultiple');
-    showToast(`${count} TV(s) dado(s) de baja correctamente. ✅`, 'success', 5000);
-    renderInventario();
-    renderDashboard();
-    resetFormMovimiento();
-
-    const tvsDadosBaja = _bajaSeleccionados.map(id => tvs.find(t => String(t.id) === String(id))).filter(Boolean);
-    if (tvsDadosBaja.length) {
-      const movGrupal = {
-        id: uid(), tvId: tvsDadosBaja[0].id, tipo: 'baja', fecha, responsable, motivo,
-        origen: 'Taller', destino: 'Baja', habDestino: '', pisoDestino: '',
-        tvsGrupo: tvsDadosBaja.map(t => ({ id: t.id, codigo: t.codigo, marca: t.marca, modelo: t.modelo, serial: t.serial, tamano: t.tamano }))
-      };
-      setTimeout(() => imprimirActaBajaMultiple(movGrupal, tvsDadosBaja), 1500);
-    }
-  } catch (err) {
-    console.error(err);
-    showToast('Error al dar de baja: ' + err.message, 'error');
-  } finally {
-    btnConfirm.textContent = prevText;
-    btnConfirm.disabled = false;
-    _bajaSeleccionados = [];
+  // Seleccionar el botón Dar de Baja
+  document.querySelectorAll('.mov-tipo-btn').forEach(b => {
+    b.classList.remove('selected', 'locked');
+  });
+  const bajaBtn = document.querySelector('.mov-tipo-btn[data-val="baja"]');
+  if (bajaBtn) {
+    bajaBtn.classList.add('selected', 'locked');
   }
+
+  // Setear tipo
+  const selTipo = document.getElementById('movTipo');
+  if (selTipo) selTipo.value = 'baja';
+
+  // Setear destino con el conteo
+  const destInput = document.getElementById('movDestino');
+  const destSelect = document.getElementById('movDestinoSelect');
+  if (destSelect) destSelect.style.display = 'none';
+  if (destInput) {
+    destInput.style.display = '';
+    destInput.removeAttribute('readonly');
+    destInput.readonly = false;
+    destInput.value = `Baja — ${tvsSeleccionados.length} TV(s)`;
+  }
+
+  // Ocultar grupo de habitación
+  const grp = document.getElementById('grpMovDestinoHab');
+  if (grp) grp.style.display = 'none';
+
+  // Mostrar panel derecho
+  const overlay = document.getElementById('movPanelOverlay');
+  if (overlay) overlay.classList.add('hidden');
+
+  // Focus en responsable
+  const respInput = document.querySelector('.mov-resp-input');
+  if (respInput) respInput.focus();
+
+  showToast(`${tvsSeleccionados.length} TV(s) seleccionado(s). Completa los datos y presiona Registrar.`, 'info', 4000);
 }
 
 // ─── INIT ─────────────────────────────────────────────────────
