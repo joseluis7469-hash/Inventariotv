@@ -77,9 +77,21 @@ function showPage(id) {
   if (id === 'historial')   renderHistorial();
   if (id === 'movimientos') {
     populateMovTV();
+    document.querySelectorAll('.mov-tipo-btn').forEach(b => {
+      b.classList.remove('selected', 'locked');
+      if (b.dataset.val === 'baja') {
+        b.disabled = false;
+        b.style.opacity = '1';
+        b.style.cursor = 'pointer';
+      } else {
+        b.disabled = true;
+        b.style.opacity = '0.35';
+        b.style.cursor = 'not-allowed';
+      }
+    });
     setTimeout(() => {
-      const firstBtn = document.querySelector('.mov-tipo-btn');
-      if (firstBtn) firstBtn.focus();
+      const bajaBtn = document.querySelector('.mov-tipo-btn[data-val="baja"]');
+      if (bajaBtn) bajaBtn.focus();
     }, 200);
   }
   if (id === 'asignar-tv')  renderAsignarTVPage();
@@ -2340,6 +2352,12 @@ if (document.getElementById('movTV')) {
 document.querySelectorAll('.mov-tipo-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     if (btn.classList.contains('locked')) return;
+
+    if (btn.dataset.val === 'baja') {
+      abrirModalBajaMultiple();
+      return;
+    }
+
     document.querySelectorAll('.mov-tipo-btn').forEach(b => {
       b.classList.remove('selected');
       b.classList.remove('locked');
@@ -2768,6 +2786,102 @@ function imprimirActaActual() {
   </script>
 </body>
 </html>
+  `);
+  w.document.close();
+}
+
+function imprimirActaBajaMultiple(mov, tvs) {
+  if (!tvs || !tvs.length) return;
+
+  const d = mov.fecha && !mov.fecha.includes('desconocida') ? new Date(mov.fecha) : new Date();
+  const fechaFmt = `Playa El Agua, ${d.toLocaleDateString('es-VE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }).replace(/de (\d{4})/, 'del $1')}.-`;
+  const horaFmt = d.toLocaleTimeString('es-VE', { hour:'2-digit', minute:'2-digit' });
+
+  const respRaw = mov.responsable || '______________________';
+  const motivo = mov.motivo || 'Baja por inoperatividad en Taller';
+
+  const filasTVs = tvs.map((t, i) => `
+    <tr>
+      <td style="padding:6px 10px; border:1px solid #ccc; text-align:center;">${i + 1}</td>
+      <td style="padding:6px 10px; border:1px solid #ccc; font-weight:bold;">${t.codigo || '—'}</td>
+      <td style="padding:6px 10px; border:1px solid #ccc;">${t.marca || '—'}</td>
+      <td style="padding:6px 10px; border:1px solid #ccc;">${t.modelo || '—'}</td>
+      <td style="padding:6px 10px; border:1px solid #ccc;">${t.tamano || '—'}</td>
+      <td style="padding:6px 10px; border:1px solid #ccc;">${t.serial || '—'}</td>
+    </tr>
+  `).join('');
+
+  const actaHTML = `
+    <div class="acta-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+      <div style="font-size:32px; line-height:1; display:flex; flex-direction:column; align-items:center; font-family:'Times New Roman', serif;">
+        |--|
+        <span style="font-size:10px; font-weight:normal; letter-spacing:2px; font-family:Arial, sans-serif; margin-top:4px;">HESPERIA</span>
+        <span style="font-size:8px; letter-spacing:1px; font-family:Arial, sans-serif;">PLAYA EL AGUA</span>
+      </div>
+      <div style="font-size:40px; font-weight:bold; display:flex; align-items:center; gap:8px; color:#444;">
+        <span style="font-size:32px;">🛡️</span>PCP
+      </div>
+    </div>
+    <div style="text-align:center; text-decoration:underline; font-weight:bold; margin:30px 0; font-size:16px; color:#1a202c;">CONSTANCIA DE BAJA DE ACTIVOS</div>
+    <div style="text-align:right; margin-bottom:30px;">${fechaFmt}</div>
+    <div style="text-align:justify; margin-bottom:20px; color:#2d3748; line-height:1.8;">
+      En esta misma fecha, siendo las <u>&nbsp;${horaFmt}&nbsp;</u>, por instrucciones de la Gerencia General, se procede a dar de baja los siguientes ${tvs.length} televisor(es) del inventario activo del HPA, quedando excluidos del parque tecnológico.
+      <br><br>
+      <strong>Procedimiento de Baja de Activos:</strong> Se procede a dar de baja los televisores listados a continuación, registrando las razones de la baja y dejando constancia del retiro de los equipos del servicio.
+    </div>
+    <div style="margin: 20px 0;">
+      <table style="width:100%; border-collapse:collapse; font-size:11px;">
+        <thead>
+          <tr style="background:#f0f0f0;">
+            <th style="padding:6px 10px; border:1px solid #ccc; text-align:center;">N°</th>
+            <th style="padding:6px 10px; border:1px solid #ccc;">Código</th>
+            <th style="padding:6px 10px; border:1px solid #ccc;">Marca</th>
+            <th style="padding:6px 10px; border:1px solid #ccc;">Modelo</th>
+            <th style="padding:6px 10px; border:1px solid #ccc;">Tamaño</th>
+            <th style="padding:6px 10px; border:1px solid #ccc;">Serial</th>
+          </tr>
+        </thead>
+        <tbody>${filasTVs}</tbody>
+      </table>
+    </div>
+    <div style="text-align:justify; margin: 20px 0; color:#2d3748; line-height:1.8;">
+      <strong>Motivo de la baja:</strong> ${motivo}<br>
+      <strong>Responsable de la ejecución:</strong> ${respRaw}
+    </div>
+    <div style="margin-top:10px; margin-bottom:60px;">
+      <div style="border-bottom:1px solid #000; height:28px;"></div>
+      <div style="border-bottom:1px solid #000; height:28px;"></div>
+      <div style="border-bottom:1px solid #000; height:28px;"></div>
+      <div style="border-bottom:1px solid #000; height:28px;"></div>
+      <div style="border-bottom:1px solid #000; height:28px;"></div>
+      <div style="border-bottom:1px solid #000; height:28px;"></div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:50px; margin-top:40px;">
+      <div style="text-align:center;">
+        <div style="border-bottom:1px solid #000; width:250px; margin:0 auto 5px;"></div>
+        <span style="font-size:12px; font-weight:bold;">${respRaw}</span><br>
+        <span style="font-size:10px; color:#666;">Responsable</span>
+      </div>
+    </div>
+    <div style="text-align:center; margin-top:40px; font-size:9px; color:#999;">
+      Documento generado automáticamente — HPA Sistema de Inventario
+    </div>
+  `;
+
+  const w = window.open('', '_blank', 'width=800,height=600');
+  w.document.write(`
+    <!DOCTYPE html>
+    <html><head>
+      <title>Acta de Baja - ${tvs.length} TV(s)</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 40px; color: #1a202c; line-height: 1.6; }
+        @media print { body { padding: 20px; } }
+      </style>
+    </head><body>${actaHTML}
+      <div style="text-align:center; margin-top:30px;">
+        <button onclick="window.print(); window.close();" style="padding:10px 25px; background:#000; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:bold;">🖨️ Imprimir Acta</button>
+      </div>
+    </body></html>
   `);
   w.document.close();
 }
@@ -4072,6 +4186,120 @@ document.addEventListener('keydown', e => {
   }
   campos[next].focus();
 });
+
+// ─── DAR DE BAJA MÚLTIPLE ──────────────────────────────────────
+let _bajaSeleccionados = [];
+
+function abrirModalBajaMultiple() {
+  _bajaSeleccionados = [];
+  const tvs = loadTVs().filter(t =>
+    (t.estado === 'taller' || String(t.ubicacion || '').toLowerCase() === 'taller') &&
+    (t.tallerEstado || 'inoperativo') === 'inoperativo' &&
+    t.estado !== 'baja'
+  );
+  const container = document.getElementById('bajaMultipleList');
+  const btnConfirm = document.getElementById('btnBajaMultipleConfirm');
+  const countEl = document.getElementById('bajaMultipleCount');
+
+  if (!tvs.length) {
+    container.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 2rem;">No hay TVs inoperativos en Taller para dar de baja.</p>';
+    btnConfirm.disabled = true;
+    countEl.textContent = '0 seleccionados';
+    openModal('modalBajaMultiple');
+    return;
+  }
+
+  container.innerHTML = tvs.map(t => `
+    <label class="baja-tv-item" style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; transition: var(--transition);" onmouseenter="this.style.borderColor='rgba(255,77,109,0.4)'" onmouseleave="this.style.borderColor='var(--border)'">
+      <input type="checkbox" class="baja-cb" value="${t.id}" onchange="actualizarBajaSeleccion()" style="width: 18px; height: 18px; accent-color: #ff4d6d; cursor: pointer;">
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 0.15rem;">
+        <span style="font-weight: 700; color: var(--accent); font-size: 0.85rem;">${t.codigo || '—'}</span>
+        <span style="color: var(--text-secondary); font-size: 0.78rem;">${t.marca || ''} ${t.modelo || ''}</span>
+        <span style="color: var(--text-muted); font-size: 0.72rem;">S/N: ${t.serial || '—'}</span>
+      </div>
+      <span class="badge badge-baja" style="font-size: 0.7rem;">Inoperativo</span>
+    </label>
+  `).join('');
+
+  btnConfirm.disabled = true;
+  countEl.textContent = '0 seleccionados';
+  openModal('modalBajaMultiple');
+}
+
+function actualizarBajaSeleccion() {
+  _bajaSeleccionados = Array.from(document.querySelectorAll('.baja-cb:checked')).map(cb => cb.value);
+  const countEl = document.getElementById('bajaMultipleCount');
+  const btnConfirm = document.getElementById('btnBajaMultipleConfirm');
+  countEl.textContent = `${_bajaSeleccionados.length} seleccionado${_bajaSeleccionados.length !== 1 ? 's' : ''}`;
+  btnConfirm.disabled = _bajaSeleccionados.length === 0;
+}
+
+async function confirmarBajaMultiple() {
+  if (!_bajaSeleccionados.length) return;
+  const btnConfirm = document.getElementById('btnBajaMultipleConfirm');
+  const prevText = btnConfirm.textContent;
+  btnConfirm.textContent = 'Procesando...';
+  btnConfirm.disabled = true;
+
+  try {
+    const tvs = loadTVs();
+    const responsable = prompt('Nombre del responsable que autoriza la baja:') || 'Sin especificar';
+    const motivo = prompt('Motivo de la baja:') || 'Baja por inoperatividad en Taller';
+    const fecha = new Date().toISOString();
+    let count = 0;
+
+    for (const tvId of _bajaSeleccionados) {
+      const tv = tvs.find(t => String(t.id) === String(tvId));
+      if (!tv) continue;
+
+      const mov = {
+        id: uid(),
+        tvId: tvId,
+        tipo: 'baja',
+        fecha: fecha,
+        responsable: responsable,
+        motivo: motivo,
+        origen: 'Taller',
+        destino: 'Baja',
+        habDestino: '',
+        pisoDestino: '',
+        creadoEn: new Date().toISOString()
+      };
+      await db.collection('movimientos').doc(mov.id).set(mov);
+
+      await db.collection('tvs').doc(tvId).update({
+        estado: 'baja',
+        ubicacion: 'Baja',
+        habitacion: '',
+        piso: ''
+      });
+      count++;
+    }
+
+    closeModal('modalBajaMultiple');
+    showToast(`${count} TV(s) dado(s) de baja correctamente. ✅`, 'success', 5000);
+    renderInventario();
+    renderDashboard();
+    resetFormMovimiento();
+
+    const tvsDadosBaja = _bajaSeleccionados.map(id => tvs.find(t => String(t.id) === String(id))).filter(Boolean);
+    if (tvsDadosBaja.length) {
+      const movGrupal = {
+        id: uid(), tvId: tvsDadosBaja[0].id, tipo: 'baja', fecha, responsable, motivo,
+        origen: 'Taller', destino: 'Baja', habDestino: '', pisoDestino: '',
+        tvsGrupo: tvsDadosBaja.map(t => ({ id: t.id, codigo: t.codigo, marca: t.marca, modelo: t.modelo, serial: t.serial, tamano: t.tamano }))
+      };
+      setTimeout(() => imprimirActaBajaMultiple(movGrupal, tvsDadosBaja), 1500);
+    }
+  } catch (err) {
+    console.error(err);
+    showToast('Error al dar de baja: ' + err.message, 'error');
+  } finally {
+    btnConfirm.textContent = prevText;
+    btnConfirm.disabled = false;
+    _bajaSeleccionados = [];
+  }
+}
 
 // ─── INIT ─────────────────────────────────────────────────────
 

@@ -1157,6 +1157,29 @@
     </div>
   </div>
 
+  <!-- MODAL: DAR DE BAJA MÚLTIPLE -->
+  <div class="modal-overlay" id="modalBajaMultiple">
+    <div class="modal" style="max-width: 750px;">
+      <div class="modal-header" style="background: linear-gradient(135deg, rgba(255,77,109,0.15), rgba(255,77,109,0.05)); border-bottom-color: rgba(255,77,109,0.3);">
+        <h3 style="color: #ff4d6d;">❌ Dar de Baja — Selección Múltiple</h3>
+        <button class="modal-close" onclick="closeModal('modalBajaMultiple')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 0.85rem;">
+          Selecciona uno o varios TVs en Taller <strong>Inoperativos</strong> para dar de baja definitiva:
+        </p>
+        <div id="bajaMultipleList" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 400px; overflow-y: auto;"></div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.2rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+          <span id="bajaMultipleCount" style="color: var(--text-muted); font-size: 0.82rem;">0 seleccionados</span>
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn btn-secondary" onclick="closeModal('modalBajaMultiple')">Cancelar</button>
+            <button class="btn btn-danger" id="btnBajaMultipleConfirm" disabled onclick="confirmarBajaMultiple()">❌ Dar de Baja</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- TOAST NOTIFICATION -->
   <div class="toast" id="toast"></div>
 
