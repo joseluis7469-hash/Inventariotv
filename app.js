@@ -2288,6 +2288,18 @@ function _movUpdateTVCard(tv) {
     if (imgEl)       imgEl.src = '';
     // Mostrar overlay (bloquear panel derecho)
     if (overlay)     overlay.classList.remove('hidden');
+    // Deshabilitar botones de tipo de movimiento (excepto baja)
+    document.querySelectorAll('.mov-tipo-btn').forEach(b => {
+      if (b.dataset.val === 'baja') {
+        b.disabled = false;
+        b.style.opacity = '1';
+        b.style.cursor = 'pointer';
+      } else {
+        b.disabled = true;
+        b.style.opacity = '0.35';
+        b.style.cursor = 'not-allowed';
+      }
+    });
     return;
   }
 
@@ -2318,6 +2330,13 @@ function _movUpdateTVCard(tv) {
   if (card)        card.style.display = '';
   // Ocultar overlay (habilitar panel derecho)
   if (overlay)     overlay.classList.add('hidden');
+
+  // Habilitar botones de tipo de movimiento
+  document.querySelectorAll('.mov-tipo-btn').forEach(b => {
+    b.disabled = false;
+    b.style.opacity = '1';
+    b.style.cursor = 'pointer';
+  });
 }
 
 
