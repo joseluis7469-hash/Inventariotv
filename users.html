@@ -1500,7 +1500,7 @@
           // Actualizar email en Firebase Auth si es el propio usuario o admin
           const currentUser = firebase.auth().currentUser;
           if (currentUser && (currentUser.uid === uid || currentUserData.role === 'admin')) {
-            await firebase.auth().updateEmail(newEmail).catch(e => {
+            await currentUser.updateEmail(newEmail).catch(e => {
               console.warn('No se pudo actualizar email en Auth:', e.message);
             });
           }
