@@ -409,7 +409,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 .card-body { padding: 1rem 1.25rem; }
 
 #dash-movimientos {
-  max-height: 600px !important;
+  height: 400px;
   overflow-y: auto;
   padding-right: 0.5rem;
 }
@@ -419,7 +419,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 #dash-movimientos::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
 #dash-taller {
-  max-height: 600px !important;
+  height: 400px;
   overflow-y: auto;
   padding-right: 0.5rem;
 }
@@ -429,7 +429,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 #dash-taller::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
 /* ---------- MINI LIST (dashboard) ---------- */
-.mini-list { list-style: none; display: flex; flex-direction: column; gap: 0.6rem; }
+.mini-list { list-style: none; display: flex; flex-direction: column; gap: 0.6rem; height: 100%; }
 .mini-list li {
   display: flex;
   align-items: center;
@@ -442,6 +442,8 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   gap: 0.5rem;
   transition: var(--transition);
   backdrop-filter: blur(4px);
+  flex: 1 1 0;
+  min-height: 0;
 }
 .mini-list li:hover { border-color: rgba(56,189,248,0.6); background: rgba(56,189,248,0.1); }
 .mini-list li:focus { outline: none; border-color: rgba(56,189,248,0.6); background: rgba(56,189,248,0.1); box-shadow: 0 0 0 2px rgba(56,189,248,0.3); }
