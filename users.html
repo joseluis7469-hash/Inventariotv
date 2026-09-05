@@ -784,6 +784,19 @@
     </div>
   </div>
 
+  <!-- ═══ HISTORIAL USUARIO MODAL ═══ -->
+  <div class="modal-overlay" id="historialModal">
+    <div class="modal" style="max-width:700px;">
+      <div class="modal-header">
+        <h3 id="historialTitle">📋 Historial del Usuario</h3>
+        <button class="modal-close" onclick="closeModal('historialModal')">✕</button>
+      </div>
+      <div class="modal-body" id="historialBody" style="max-height:60vh; overflow-y:auto;">
+        <p style="color:var(--text-muted); text-align:center;">Cargando historial...</p>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══ CHANGE PASSWORD/EMAIL MODAL ═══ -->
   <div class="modal-overlay" id="passwordModal">
     <div class="modal" style="max-width:420px;">
@@ -1326,8 +1339,9 @@
               <button class="action-btn" title="Ver detalle" onclick="viewUser('${u.uid}')">👁️</button>
               ${canEdit && !isDeleted ? `<button class="action-btn" title="Editar usuario" onclick="editUser('${u.uid}')">✏️</button>` : ''}
               ${canEdit && !isDeleted ? `<button class="action-btn" title="Cambiar credenciales" onclick="openPasswordModal('${u.uid}')">🔑</button>` : ''}
+              ${isAdmin && !isCurrentUser && !isDeleted ? `<button class="action-btn" title="Historial del usuario" onclick="verHistorialUsuario('${u.uid}','${u.name}')">📋</button>` : ''}
               ${isAdmin && !isCurrentUser && !isDeleted ? `<button class="action-btn" title="${u.status === 'active' ? 'Desactivar' : 'Activar'} usuario" onclick="toggleUserStatus('${u.uid}', '${u.status}')">${u.status === 'active' ? '🔴' : '🟢'}</button>` : ''}
-              ${isAdmin && !isCurrentUser ? `<button class="action-btn delete" title="${isDeleted ? 'Eliminar permanentemente' : 'Ocultar registro'}" onclick="${isDeleted ? `confirmarEliminacionFisicaUsuario('${u.uid}','${u.name}')` : `confirmDelete('${u.uid}','${u.name}')`}">${isDeleted ? '💀' : '🗑️'}</button>` : ''}
+              ${isAdmin && !isCurrentUser ? `<button class="action-btn delete" title="${isDeleted ? 'Eliminar permanentemente' : 'Eliminar usuario'}" onclick="${isDeleted ? `confirmarEliminacionFisicaUsuario('${u.uid}','${u.name}')` : `confirmDelete('${u.uid}','${u.name}')`}">${isDeleted ? '💀' : '🗑️'}</button>` : ''}
             </div>
           </td>
         </tr>`;
@@ -1560,6 +1574,76 @@
         btn.disabled = false;
       }
     });
+
+    // ── Historial de Usuario ──
+    async function verHistorialUsuario(uid, name) {
+      document.getElementById('historialTitle').textContent = `📋 Historial de ${name}`;
+      document.getElementById('historialBody').innerHTML = '<p style="color:var(--text-muted); text-align:center;">Cargando historial...</p>';
+      openModal('historialModal');
+
+      try {
+        const userDoc = await db.collection('usuarios').doc(uid).get();
+        const userData = userDoc.exists ? userDoc.data() : {};
+
+        const movSnap = await db.collection('movimientos')
+          .where('responsable', '==', name).get().catch(() => ({ docs: [] }));
+        const movSnap2 = await db.collection('movimientos')
+          .where('creadoPor', '==', uid).get().catch(() => ({ docs: [] }));
+
+        const movMap = new Map();
+        [...movSnap.docs, ...movSnap2.docs].forEach(d => movMap.set(d.id, { id: d.id, ...d.data() }));
+        const movimientos = Array.from(movMap.values()).sort((a, b) => {
+          const fa = a.fechaMov || a.creadoEn || '';
+          const fb = b.fechaMov || b.creadoEn || '';
+          return fb.localeCompare(fa);
+        });
+
+        let html = '';
+
+        html += `<div style="margin-bottom:1rem; padding:0.8rem; background:rgba(0,212,255,0.08); border-radius:8px; border:1px solid rgba(0,212,255,0.2);">
+          <div style="font-weight:700; color:var(--accent); margin-bottom:0.4rem;">👤 Datos del Usuario</div>
+          <div style="font-size:0.82rem; color:var(--text-secondary); line-height:1.8;">
+            <strong>Nombre:</strong> ${userData.name || '—'}<br>
+            <strong>Email:</strong> ${userData.email || '—'}<br>
+            <strong>Rol:</strong> ${userData.role || '—'}<br>
+            <strong>Estado:</strong> ${userData.status === 'active' ? '🟢 Activo' : '🔴 Inactivo'}<br>
+            <strong>Creado:</strong> ${userData.createdAt ? new Date(userData.createdAt).toLocaleString('es-VE') : '—'}<br>
+            <strong>Último acceso:</strong> ${userData.lastLogin ? new Date(userData.lastLogin).toLocaleString('es-VE') : '—'}
+          </div>
+        </div>`;
+
+        html += `<div style="font-weight:700; color:var(--accent); margin-bottom:0.5rem;">📦 Movimientos registrados (${movimientos.length})</div>`;
+
+        if (movimientos.length === 0) {
+          html += '<p style="color:var(--text-muted); text-align:center; padding:1rem;">No hay movimientos registrados.</p>';
+        } else {
+          html += `<div style="display:flex; flex-direction:column; gap:0.5rem;">`;
+          movimientos.forEach(m => {
+            const fecha = m.fechaMov || m.creadoEn || '';
+            const fechaFmt = fecha ? new Date(fecha).toLocaleString('es-VE') : '—';
+            const tipoLabels = { traslado: '🏠 Traslado', entrada_taller: '🔧 Envío Taller', salida_taller: '🔄 Salida Taller', baja: '❌ Baja', otro: '📝 Otro' };
+            const tipo = tipoLabels[m.tipo] || m.tipo || '—';
+            html += `<div style="padding:0.7rem; background:rgba(0,0,0,0.25); border-radius:8px; border:1px solid rgba(255,255,255,0.1);">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.3rem;">
+                <span style="font-size:0.85rem; font-weight:600; color:var(--accent);">${tipo}</span>
+                <span style="font-size:0.75rem; color:var(--text-muted);">${fechaFmt}</span>
+              </div>
+              <div style="font-size:0.8rem; color:var(--text-secondary);">
+                <strong>TV:</strong> ${m.tvCodigo || '—'} &nbsp;|&nbsp;
+                <strong>Origen:</strong> ${m.origen || '—'} &nbsp;→&nbsp;
+                <strong>Destino:</strong> ${m.destino || '—'}
+              </div>
+              ${m.motivo ? `<div style="font-size:0.78rem; color:var(--text-muted); margin-top:0.25rem;"><strong>Motivo:</strong> ${m.motivo}</div>` : ''}
+            </div>`;
+          });
+          html += `</div>`;
+        }
+
+        document.getElementById('historialBody').innerHTML = html;
+      } catch (err) {
+        document.getElementById('historialBody').innerHTML = `<p style="color:var(--danger); text-align:center;">Error al cargar historial: ${err.message}</p>`;
+      }
+    }
 
     // ── Delete ──
     let _deleteUid = null;
