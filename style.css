@@ -147,6 +147,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   color: #ffffff;
   outline: none;
   text-shadow: 0 0 12px rgba(56,189,248,0.8);
+  transform: scale(1.03);
 }
 
 .nav-item.active {
