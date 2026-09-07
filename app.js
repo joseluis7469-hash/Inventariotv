@@ -7,6 +7,66 @@
 const DB_TVS  = 'hpa_tvs';
 const DB_MOVS = 'hpa_movimientos';
 
+// ─── VERIFICACIÓN DE FECHA/HORA DEL PC ──────────────────────
+let _fechaPCValida = false;
+
+function verificarFechaPC() {
+  const ahora = new Date();
+  const anio = ahora.getFullYear();
+  const mes = ahora.getMonth() + 1;
+  const dia = ahora.getDate();
+  const horas = ahora.getHours();
+  const minutos = ahora.getMinutes();
+
+  // Validar año razonable
+  if (anio < 2024 || anio > 2030) {
+    _fechaPCValida = false;
+    mostrarAlertaFecha(`El año del sistema es ${anio}. Verifica la fecha y hora de tu PC.`, 'invalida');
+    return false;
+  }
+
+  // Validar que no sea 00:00 exacto (posible fecha no sincronizada)
+  if (horas === 0 && minutos === 0 && dia === 1) {
+    _fechaPCValida = false;
+    mostrarAlertaFecha('La fecha y hora de tu PC parece no estar sincronizada. Actualízala para continuar.', 'sospechosa');
+    return false;
+  }
+
+  // Fecha correcta
+  _fechaPCValida = true;
+  return true;
+}
+
+function mostrarAlertaFecha(mensaje, tipo) {
+  const modal = document.getElementById('fechaAlertaModal');
+  const msgEl = document.getElementById('fechaAlertaMensaje');
+  const iconEl = document.getElementById('fechaAlertaIcono');
+  const titleEl = document.getElementById('fechaAlertaTitulo');
+
+  if (!modal) return;
+
+  if (tipo === 'invalida') {
+    iconEl.textContent = '⚠️';
+    titleEl.textContent = 'Fecha/Hora Incorrecta';
+    msgEl.innerHTML = `<strong>${mensaje}</strong><br><br>Para corregir:<br>1. Haz clic derecho en el reloj de tu PC<br>2. Selecciona "Ajustar fecha y hora"<br>3. Activa "Configurar automáticamente"<br><br>Una vez corregido, recarga la página.`;
+  } else {
+    iconEl.textContent = '⏰';
+    titleEl.textContent = 'Fecha/Hora Sospechosa';
+    msgEl.innerHTML = `<strong>${mensaje}</strong><br><br>Verifica la fecha y hora en la configuración de tu PC.`;
+  }
+
+  modal.classList.add('open');
+}
+
+function cerrarAlertaFecha() {
+  const modal = document.getElementById('fechaAlertaModal');
+  if (modal) modal.classList.remove('open');
+}
+
+function fechaPCRequiereAccion() {
+  return !_fechaPCValida;
+}
+
 // Funciones de carga que filtran registros eliminados lógicamente
 // Por defecto nadie ve los eliminados. El admin puede activar "Ver eliminados".
 function loadTVs()   {
@@ -3252,6 +3312,13 @@ function resetFormMovimiento() {
 
 document.getElementById('formMovimiento').addEventListener('submit', async e => {
   e.preventDefault();
+
+  // Verificar fecha/hora del PC antes de registrar
+  if (!verificarFechaPC()) {
+    showToast('Corrige la fecha y hora de tu PC antes de registrar movimientos.', 'error', 5000);
+    return;
+  }
+
   const get = id => document.getElementById(id).value.trim();
   
   const tvId = get('movTV');
@@ -3686,6 +3753,12 @@ document.getElementById('btnClearAsignarFecha').addEventListener('click', functi
 
 document.getElementById('btnConfirmAsignar').addEventListener('click', async () => {
   if (!_asignarTvId) return;
+
+  // Verificar fecha/hora del PC antes de asignar
+  if (!verificarFechaPC()) {
+    showToast('Corrige la fecha y hora de tu PC antes de asignar TVs.', 'error', 5000);
+    return;
+  }
 
   const tvsCheck = loadTVs();
   const tvCheck = tvsCheck.find(t => String(t.id) === String(_asignarTvId));
@@ -4355,6 +4428,9 @@ async function confirmarBajaMultiple() {
 })();
 
 showPage('dashboard');
+
+// Verificar fecha/hora del PC al iniciar sesión
+setTimeout(() => { verificarFechaPC(); }, 500);
 
 // ─── TEMP: Revertir bajas HPA-012, HPA-017, HPA-031 ────────
 window.revertBajas = async function() {
