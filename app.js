@@ -704,10 +704,12 @@ function renderDashboard() {
       const movsTv = movs.filter(m => String(m.tvId) === String(t.id));
       const ultimoMov = movsTv.length ? movsTv[movsTv.length - 1] : null;
       const actaIcon = ultimoMov ? `<span class="ml-acta-icon" title="Ver acta" style="cursor:pointer; margin-left:6px; font-size:0.85rem; opacity:0.7;" onclick="event.stopPropagation(); openActaFromMov(event, '${ultimoMov.id}')">📄</span>` : '';
+      const fechaMov = ultimoMov ? fmtDate(ultimoMov.creadoEn || ultimoMov.fecha) : '';
       return `<li tabindex="0" data-tvid="${t.id}">
         <div class="ml-left">
           <span class="ml-code">${t.codigo}</span>
           <span class="ml-desc-row"><span class="ml-desc">${t.marca} ${t.modelo} – Hab. ${t.habitacion}</span>${actaIcon}</span>
+          ${fechaMov ? `<span style="font-size:0.65rem; color:var(--text-muted); margin-top:2px;">📅 ${fechaMov}</span>` : ''}
         </div>
       </li>`;
     }).join('') + '</ul>';
