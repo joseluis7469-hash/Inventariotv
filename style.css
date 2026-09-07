@@ -479,6 +479,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   background: none; border: none; outline: none;
   color: var(--text-primary); padding: 0.65rem 0;
   width: 100%;
+  text-align: left;
 }
 
 .filter-group { display: flex; gap: 0.6rem; flex-wrap: wrap; }
