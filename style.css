@@ -481,6 +481,7 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   width: 100%;
   text-align: left;
 }
+.search-box input::placeholder { text-align: left; }
 
 .filter-group { display: flex; gap: 0.6rem; flex-wrap: wrap; }
 
