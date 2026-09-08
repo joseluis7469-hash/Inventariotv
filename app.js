@@ -85,6 +85,56 @@ function loadAllMovs() { return window.appData.movimientos || []; }
 
 let currentImgFile = null;
 
+// ─── REPARACIÓN: Control de cambio inoperativo → operativo ──
+let _reparacionPending = false;
+let _reparacionTvData = null;
+
+function cancelarReparacion() {
+  _reparacionPending = false;
+  _reparacionTvData = null;
+  closeModal('modalReparacion');
+}
+
+async function confirmarReparacion() {
+  const tecnico = document.getElementById('reparacionTecnico').value.trim();
+  const fecha = document.getElementById('reparacionFecha').value;
+  const obs = document.getElementById('reparacionObs').value.trim();
+
+  if (!tecnico) { showToast('Ingresa el nombre del técnico.', 'error'); return; }
+  if (!fecha) { showToast('Selecciona la fecha de reparación.', 'error'); return; }
+
+  closeModal('modalReparacion');
+
+  if (_reparacionTvData) {
+    const tv = _reparacionTvData;
+    const fechaFmt = new Date(fecha).toLocaleString('es-VE');
+    const obsReparacion = `[Reparado por ${tecnico} el ${fechaFmt}]${obs ? ' — ' + obs : ''}`;
+
+    const obsActual = tv.observaciones || '';
+    tv.observaciones = obsActual ? obsActual + '\n' + obsReparacion : obsReparacion;
+
+    try {
+      // Guardar el TV con la observación de reparación
+      await db.collection('tvs').doc(tv.id).set(tv);
+
+      await registrarEventoTV({
+        tipo: 'tv_reparado',
+        tvId: tv.id,
+        codigo: tv.codigo,
+        detalle: `TV ${tv.codigo} reparado por ${tecnico}. ${obs || ''}`
+      });
+
+      showToast(`✅ TV ${tv.codigo} marcado como operativo. Reparado por ${tecnico}.`, 'success', 4000);
+      renderInventario();
+    } catch (err) {
+      showToast('Error al guardar reparación: ' + err.message, 'error');
+    }
+  }
+
+  _reparacionPending = false;
+  _reparacionTvData = null;
+}
+
 // ─── NAVEGACIÓN ─────────────────────────────────────────────
 const pageTitles = {
   dashboard:    'Panel',
@@ -1935,6 +1985,9 @@ function editarTV(id) {
   document.getElementById('tvId').value          = tv.id;
   document.getElementById('tvCodigo').value       = tv.codigo;
   
+  // Guardar estado original del taller para detectar cambio inoperativo→operativo
+  window._tallerEstadoOriginal = tv.tallerEstado || 'inoperativo';
+  
   renderMarcas();
   document.getElementById('tvMarca').value        = tv.marca || '';
   if (document.getElementById('tvMarca').selectedIndex === -1 && tv.marca) {
@@ -2133,6 +2186,29 @@ document.getElementById('formTV').addEventListener('submit', e => {
   const prevText = btnSubmit.textContent;
   btnSubmit.textContent = 'Guardando...';
   btnSubmit.disabled = true;
+
+  // Detectar cambio inoperativo → operativo
+  const origTallerEstado = window._tallerEstadoOriginal || 'inoperativo';
+  const nuevoTallerEstado = tv.tallerEstado || '';
+  if (origTallerEstado === 'inoperativo' && nuevoTallerEstado === 'operativo') {
+    _reparacionTvData = tv;
+    _reparacionPending = true;
+    btnSubmit.textContent = prevText;
+    btnSubmit.disabled = false;
+
+    document.getElementById('reparacionTecnico').value = '';
+    document.getElementById('reparacionObs').value = '';
+    const ahora = new Date();
+    const y = ahora.getFullYear();
+    const m = String(ahora.getMonth() + 1).padStart(2, '0');
+    const d = String(ahora.getDate()).padStart(2, '0');
+    const hh = String(ahora.getHours()).padStart(2, '0');
+    const mm = String(ahora.getMinutes()).padStart(2, '0');
+    document.getElementById('reparacionFecha').value = `${y}-${m}-${d}T${hh}:${mm}`;
+    openModal('modalReparacion');
+    document.getElementById('reparacionTecnico').focus();
+    return;
+  }
 
   try {
     // La imagen ya está comprimida en currentImgTrasera como base64

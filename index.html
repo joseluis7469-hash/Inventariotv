@@ -754,6 +754,34 @@
     </div>
   </div>
 
+  <!-- MODAL: INFORMACIÓN DE REPARACIÓN -->
+  <div class="modal-overlay" id="modalReparacion" style="z-index: 9999;">
+    <div class="modal modal-sm">
+      <div class="modal-header" style="background:rgba(0,245,160,0.15); border-bottom-color:rgba(0,245,160,0.3);">
+        <h3 style="color:#00f5a0;">🔧 Registro de Reparación</h3>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1rem;">El TV cambió de <strong style="color:#ff4d6d;">Inoperativo</strong> a <strong style="color:#00f5a0;">Operativo</strong>. Registra los datos de la reparación:</p>
+        <div style="margin-bottom:0.8rem;">
+          <label style="font-size:0.8rem; font-weight:600; color:var(--text-primary);">👤 Nombre del Técnico *</label>
+          <input type="text" id="reparacionTecnico" placeholder="Nombre del técnico que reparó" style="width:100%; padding:0.6rem; background:var(--bg-input); border:1px solid var(--border); color:var(--text-primary); border-radius:6px; margin-top:0.3rem;" />
+        </div>
+        <div style="margin-bottom:0.8rem;">
+          <label style="font-size:0.8rem; font-weight:600; color:var(--text-primary);">📅 Fecha de Reparación *</label>
+          <input type="datetime-local" id="reparacionFecha" style="width:100%; padding:0.6rem; background:var(--bg-input); border:1px solid var(--border); color:var(--text-primary); border-radius:6px; margin-top:0.3rem;" />
+        </div>
+        <div style="margin-bottom:0.8rem;">
+          <label style="font-size:0.8rem; font-weight:600; color:var(--text-primary);">📝 Observaciones</label>
+          <textarea id="reparacionObs" rows="2" placeholder="Detalle de la reparación realizada..." style="width:100%; padding:0.6rem; background:var(--bg-input); border:1px solid var(--border); color:var(--text-primary); border-radius:6px; margin-top:0.3rem; resize:vertical;"></textarea>
+        </div>
+        <div style="display:flex; gap:0.8rem; justify-content:flex-end;">
+          <button class="btn btn-outline btn-sm" onclick="cancelarReparacion()">Cancelar</button>
+          <button class="btn btn-primary btn-sm" onclick="confirmarReparacion()">✅ Guardar Reparación</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL: VERIFICACIÓN DE FECHA/HORA AL INICIAR SESIÓN -->
   <div class="modal-overlay" id="fechaAlertaModal" style="z-index: 10000;">
     <div class="modal modal-sm">
