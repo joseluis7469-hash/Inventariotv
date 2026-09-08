@@ -88,12 +88,13 @@
     <!-- PAGE: DASHBOARD -->
     <section class="page active" id="page-dashboard">
       <div class="stats-grid">
-        <div class="stat-card stat-total">
+        <div class="stat-card stat-total" style="position:relative;">
           <div class="stat-icon">📺</div>
           <div class="stat-info">
             <span class="stat-num" id="stat-total">0</span>
             <span class="stat-label">Total TVs</span>
           </div>
+          <span id="stat-total-incluye-baja" style="position:absolute; top:6px; right:10px; font-size:0.6rem; color:var(--text-muted); opacity:0.7;">(0)</span>
         </div>
         <div class="stat-card stat-activo">
           <div class="stat-icon">✅</div>

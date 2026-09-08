@@ -650,6 +650,7 @@ function renderDashboard() {
   const movs = loadMovs();
 
   document.getElementById('stat-total').textContent   = tvs.filter(t => t.estado !== 'baja').length;
+  document.getElementById('stat-total-incluye-baja').textContent = `(${tvs.length})`;
   document.getElementById('stat-activos').textContent = tvs.filter(t => t.estado === 'activo').length;
   document.getElementById('stat-taller').textContent  = tvs.filter(t => t.estado === 'taller').length;
   document.getElementById('stat-baja').textContent    = tvs.filter(t => t.estado === 'baja').length;
