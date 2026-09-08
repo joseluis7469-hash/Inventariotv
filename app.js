@@ -88,14 +88,16 @@ let currentImgFile = null;
 // ─── REPARACIÓN: Control de cambio inoperativo → operativo ──
 let _reparacionPending = false;
 let _reparacionTvData = null;
+let _reparacionResolve = null;
 
 function cancelarReparacion() {
   _reparacionPending = false;
   _reparacionTvData = null;
   closeModal('modalReparacion');
+  if (_reparacionResolve) { _reparacionResolve(false); _reparacionResolve = null; }
 }
 
-async function confirmarReparacion() {
+function confirmarReparacion() {
   const tecnico = document.getElementById('reparacionTecnico').value.trim();
   const fecha = document.getElementById('reparacionFecha').value;
   const obs = document.getElementById('reparacionObs').value.trim();
@@ -105,32 +107,17 @@ async function confirmarReparacion() {
 
   closeModal('modalReparacion');
 
-  if (_reparacionTvData) {
-    const tv = _reparacionTvData;
-    const fechaFmt = new Date(fecha).toLocaleString('es-VE');
-    const obsReparacion = `[Reparado por ${tecnico} el ${fechaFmt}]${obs ? ' — ' + obs : ''}`;
+  const fechaFmt = new Date(fecha).toLocaleString('es-VE');
+  const obsReparacion = `[Reparado por ${tecnico} el ${fechaFmt}]${obs ? ' — ' + obs : ''}`;
 
-    const obsActual = tv.observaciones || '';
-    tv.observaciones = obsActual ? obsActual + '\n' + obsReparacion : obsReparacion;
-
-    try {
-      // Guardar el TV con la observación de reparación
-      await db.collection('tvs').doc(tv.id).set(tv);
-
-      await registrarEventoTV({
-        tipo: 'tv_reparado',
-        tvId: tv.id,
-        codigo: tv.codigo,
-        detalle: `TV ${tv.codigo} reparado por ${tecnico}. ${obs || ''}`
-      });
-
-      showToast(`✅ TV ${tv.codigo} marcado como operativo. Reparado por ${tecnico}.`, 'success', 4000);
-      renderInventario();
-    } catch (err) {
-      showToast('Error al guardar reparación: ' + err.message, 'error');
-    }
+  // Agregar observación al campo del formulario
+  const obsField = document.getElementById('tvObservaciones');
+  const obsActual = obsField ? obsField.value.trim() : '';
+  if (obsField) {
+    obsField.value = obsActual ? obsActual + '\n' + obsReparacion : obsReparacion;
   }
 
+  if (_reparacionResolve) { _reparacionResolve(true, obsReparacion); _reparacionResolve = null; }
   _reparacionPending = false;
   _reparacionTvData = null;
 }
@@ -2191,8 +2178,6 @@ document.getElementById('formTV').addEventListener('submit', e => {
   const origTallerEstado = window._tallerEstadoOriginal || 'inoperativo';
   const nuevoTallerEstado = tv.tallerEstado || '';
   if (origTallerEstado === 'inoperativo' && nuevoTallerEstado === 'operativo') {
-    _reparacionTvData = tv;
-    _reparacionPending = true;
     btnSubmit.textContent = prevText;
     btnSubmit.disabled = false;
 
@@ -2207,7 +2192,9 @@ document.getElementById('formTV').addEventListener('submit', e => {
     document.getElementById('reparacionFecha').value = `${y}-${m}-${d}T${hh}:${mm}`;
     openModal('modalReparacion');
     document.getElementById('reparacionTecnico').focus();
-    return;
+
+    const reparado = await new Promise(resolve => { _reparacionResolve = resolve; });
+    if (!reparado) return;
   }
 
   try {
