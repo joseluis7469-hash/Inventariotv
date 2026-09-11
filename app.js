@@ -1868,13 +1868,12 @@ function abrirModalBajas() {
     return;
   }
   const rows = tvs.map(t => `
-    <div class="mini-list-item" style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; margin-bottom:6px; background:rgba(255,77,109,0.08); border:1px solid rgba(255,77,109,0.2); border-radius:8px; cursor:pointer;" onclick="verDetalle('${t.id}')">
+    <div class="mini-list-item" style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; margin-bottom:4px; background:rgba(255,77,109,0.08); border:1px solid rgba(255,77,109,0.2); border-radius:8px; cursor:pointer;" onclick="verDetalle('${t.id}')">
       <div>
-        <div style="font-weight:700; font-size:0.95rem; color:var(--text-primary);">${t.codigo}</div>
-        <div style="font-size:0.78rem; color:var(--text-secondary);">${t.marca || ''} ${t.modelo || ''} ${t.pulgadas ? '| '+t.pulgadas+'"' : ''}</div>
-        <div style="font-size:0.72rem; color:var(--text-muted);">${t.fechaBaja ? 'Baja: '+t.fechaBaja : ''} ${t.motivoBaja ? '| '+t.motivoBaja : ''}</div>
+        <div style="font-weight:700; font-size:0.85rem; color:var(--text-primary);">${t.codigo}</div>
+        <div style="font-size:0.72rem; color:var(--text-secondary);">${t.serial || '—'}</div>
       </div>
-      <span style="font-size:0.7rem; padding:3px 10px; border-radius:12px; background:rgba(255,77,109,0.2); color:#ff4d6d; font-weight:600;">❌ Baja</span>
+      <span style="font-size:0.65rem; padding:2px 8px; border-radius:12px; background:rgba(255,77,109,0.2); color:#ff4d6d; font-weight:600;">❌ Baja</span>
     </div>
   `).join('');
   body.innerHTML = `
