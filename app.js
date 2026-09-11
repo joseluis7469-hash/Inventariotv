@@ -963,29 +963,41 @@ function imprimirDetalleTV() {
   const printWin = window.open('', '_blank', 'width=800,height=600');
   printWin.document.write(`<!DOCTYPE html><html><head><title>Control de TV</title>
     <style>
-      body { font-family: Arial, sans-serif; padding: 20px; color: #1a202c; }
-      .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-      .detail-item { border-bottom: 1px solid #e2e8f0; padding: 6px 0; }
-      .di-label { font-size: 0.75rem; text-transform: uppercase; color: #718096; display: block; font-weight: 600; }
-      .di-value { font-size: 0.95rem; color: #2d3748; }
-      .detail-images-section { margin: 20px 0; text-align: center; }
-      .detail-images-section img { max-width: 100%; max-height: 300px; }
-      .historial-section { margin-top: 20px; }
-      .historial-section h4 { border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 10px; }
-      .ht-item { padding: 8px 0; border-bottom: 1px solid #f7fafc; }
+      @page { margin: 12mm 10mm; }
+      * { box-sizing: border-box; }
+      body { font-family: Arial, sans-serif; padding: 0; color: #1a202c; font-size: 11px; margin: 0; }
+      .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; margin-bottom: 10px; }
+      .detail-item { border-bottom: 1px solid #e2e8f0; padding: 3px 0; }
+      .di-label { font-size: 8px; text-transform: uppercase; color: #718096; display: block; font-weight: 600; letter-spacing: 0.3px; }
+      .di-value { font-size: 10.5px; color: #2d3748; }
+      .detail-images-section { margin: 8px 0; text-align: center; }
+      .detail-images-section h4 { font-size: 11px; margin: 0 0 4px; }
+      .detail-images-section img { max-width: 100%; max-height: 160px; }
+      .historial-section { margin-top: 10px; }
+      .historial-section h4 { font-size: 11px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin: 0 0 6px; }
+      .ht-item { padding: 4px 0; border-bottom: 1px solid #f7fafc; }
       .ht-head { display: flex; justify-content: space-between; }
-      .ht-tipo { font-weight: 600; }
-      .ht-fecha { color: #718096; font-size: 0.8rem; }
-      .ht-motivo { color: #4a5568; margin: 4px 0; }
-      .ht-resp { color: #718096; font-size: 0.85rem; }
-      .btn-print { display: none; }
-      @media print { .btn-print { display: none; } }
+      .ht-tipo { font-weight: 600; font-size: 10px; }
+      .ht-fecha { color: #718096; font-size: 9px; }
+      .ht-motivo { color: #4a5568; margin: 2px 0; font-size: 10px; }
+      .ht-resp { color: #718096; font-size: 9px; }
+      .btn-print { display: none !important; }
+      .empty-state { font-size: 10px; color: #718096; }
+      .ht-icon { font-size: 10px; margin-right: 4px; }
+      .ht-content { font-size: 10px; }
+      .historial-timeline { font-size: 10px; }
+      #modalDetalleBody > div:first-child { display: none !important; }
     </style>
   </head><body>
-    <div style="text-align:center; margin-bottom:16px; font-size:14px; color:#718096;">Hesperia Playa El Agua</div>
-    ${body.innerHTML}
+    <div style="text-align:center; margin-bottom:8px; font-size:12px; color:#718096;">Hesperia Playa El Agua</div>
+    <div id="printContent"></div>
   </body></html>`);
   printWin.document.close();
+  const content = printWin.document.getElementById('printContent');
+  const clone = body.cloneNode(true);
+  const printBtn = clone.querySelector('div[style*="justify-content:flex-end"]');
+  if (printBtn) printBtn.remove();
+  content.innerHTML = clone.innerHTML;
   setTimeout(() => { printWin.print(); }, 500);
 }
 
