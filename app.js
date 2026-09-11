@@ -508,6 +508,7 @@ function closeModal(id) {
     }
   }
   if (id === 'modalDetalle') {
+    document.getElementById('modalDetalle').style.zIndex = '';
     const searchInput = document.getElementById('searchInventario');
     const filterEstado = document.getElementById('filterEstado');
     if (searchInput) { searchInput.value = ''; searchInput.dispatchEvent(new Event('input', {bubbles:true})); }
@@ -863,6 +864,13 @@ function verDetalle(id) {
   const movs = loadMovs();
   const tv   = tvs.find(t => String(t.id) === String(id));
   if (!tv) return;
+
+  const alreadyOpen = document.querySelector('.modal-overlay.open');
+  if (alreadyOpen && alreadyOpen.id !== 'modalDetalle') {
+    document.getElementById('modalDetalle').style.zIndex = 300;
+  } else {
+    document.getElementById('modalDetalle').style.zIndex = '';
+  }
 
   const historial = movs.filter(m => String(m.tvId) === String(id))
     .sort((a,b) => b.fecha.localeCompare(a.fecha));
