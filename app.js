@@ -85,43 +85,6 @@ function loadAllMovs() { return window.appData.movimientos || []; }
 
 let currentImgFile = null;
 
-// ─── REPARACIÓN: Control de cambio inoperativo → operativo ──
-let _reparacionPending = false;
-let _reparacionTvData = null;
-let _reparacionResolve = null;
-
-function cancelarReparacion() {
-  _reparacionPending = false;
-  _reparacionTvData = null;
-  closeModal('modalReparacion');
-  if (_reparacionResolve) { _reparacionResolve(false); _reparacionResolve = null; }
-}
-
-function confirmarReparacion() {
-  const tecnico = document.getElementById('reparacionTecnico').value.trim();
-  const fecha = document.getElementById('reparacionFecha').value;
-  const obs = document.getElementById('reparacionObs').value.trim();
-
-  if (!tecnico) { showToast('Ingresa el nombre del técnico.', 'error'); return; }
-  if (!fecha) { showToast('Selecciona la fecha de reparación.', 'error'); return; }
-
-  closeModal('modalReparacion');
-
-  const fechaFmt = new Date(fecha).toLocaleString('es-VE');
-  const obsReparacion = `[Reparado por ${tecnico} el ${fechaFmt}]${obs ? ' — ' + obs : ''}`;
-
-  // Agregar observación al campo del formulario
-  const obsField = document.getElementById('tvObservaciones');
-  const obsActual = obsField ? obsField.value.trim() : '';
-  if (obsField) {
-    obsField.value = obsActual ? obsActual + '\n' + obsReparacion : obsReparacion;
-  }
-
-  if (_reparacionResolve) { _reparacionResolve(true, obsReparacion); _reparacionResolve = null; }
-  _reparacionPending = false;
-  _reparacionTvData = null;
-}
-
 // ─── NAVEGACIÓN ─────────────────────────────────────────────
 const pageTitles = {
   dashboard:    'Panel',
@@ -160,13 +123,20 @@ function showPage(id) {
     adminInvTools.style.display = hasPermission('eliminar_base_datos') ? 'flex' : 'none';
   }
 
+  // Limpiar filtros del inventario al salir de esa página
+  if (id !== 'inventario') {
+    const prevSearch = document.getElementById('searchInventario');
+    const prevEstado = document.getElementById('filterEstado');
+    if (prevSearch) prevSearch.value = '';
+    if (prevEstado) prevEstado.value = '';
+  }
+
   // Limpiar campo de búsqueda al mostrar la página de inventario
   if (id === 'inventario') {
     const searchInput = document.getElementById('searchInventario');
-    if (searchInput) {
-      searchInput.value = '';
-      applyInventarioFilters();
-    }
+    const filterEstado = document.getElementById('filterEstado');
+    if (searchInput) { searchInput.value = ''; searchInput.dispatchEvent(new Event('input', {bubbles:true})); }
+    if (filterEstado) { filterEstado.value = ''; filterEstado.dispatchEvent(new Event('change', {bubbles:true})); }
   }
 
   if (id === 'dashboard')   renderDashboard();
@@ -293,6 +263,7 @@ function fmtDateOnly(iso) {
 const tipoLabel = {
   traslado_hab:   '🔀 Traslado habitación',
   entrada_taller: '🔧 Enviado a taller',
+  reparacion:     '✅ Reparado',
   baja:           '❌ Dado de baja',
   otro:           '📝 Otro',
   tv_creado:      '➕ TV registrado',
@@ -536,6 +507,12 @@ function closeModal(id) {
       img.style.transform = 'scale(0.95)';
     }
   }
+  if (id === 'modalDetalle') {
+    const searchInput = document.getElementById('searchInventario');
+    const filterEstado = document.getElementById('filterEstado');
+    if (searchInput) { searchInput.value = ''; searchInput.dispatchEvent(new Event('input', {bubbles:true})); }
+    if (filterEstado) { filterEstado.value = ''; filterEstado.dispatchEvent(new Event('change', {bubbles:true})); }
+  }
   if (_lastFocusedElement) { _lastFocusedElement.focus(); _lastFocusedElement = null; }
 }
 
@@ -695,9 +672,9 @@ function renderDashboard() {
   const sinTV = getHabitacionesSinTV();
   document.getElementById('stat-sintv').textContent = sinTV.length;
 
-  // Últimos movimientos (ordenados por momento real de creación, en caliente)
+  // Últimos movimientos (solo movimientos reales, no eventos de edición)
   const elMov = document.getElementById('dash-movimientos');
-  const recientes = [...movs].sort((a, b) => {
+  const recientes = movs.filter(m => !m.esEvento).sort((a, b) => {
     const fa = (a.creadoEn || a.fecha || '');
     const fb = (b.creadoEn || b.fecha || '');
     const aDesconocida = !fa || fa.includes('desconocida') || fa.includes('0001') || fa.includes('0000');
@@ -906,7 +883,7 @@ function verDetalle(id) {
     ['Resolución',     tv.resolucion || '—'],
     ['Smart TV',       tv.smarttv === 'si' ? 'Sí' : 'No'],
     ['Ubicación',      ubiMostrar],
-    ['Estado',         tv.estado],
+    ['Estado',         (String(tv.ubicacion || '').toLowerCase() === 'taller') ? (tv.tallerEstado || 'inoperativo') : tv.estado],
     ['Observaciones',  tv.observaciones || '—'],
   ];
 
@@ -967,7 +944,7 @@ function verDetalle(id) {
 }
 
 function tipoIcon(tipo) {
-  const icons = { traslado_hab:'🔀', entrada_taller:'🔧', retorno_taller:'✅',
+  const icons = { traslado_hab:'🔀', entrada_taller:'🔧', reparacion:'✅',
                   baja:'❌', otro:'📝' };
   return icons[tipo] || '📝';
 }
@@ -1660,11 +1637,8 @@ function resetFormTV() {
   document.getElementById('tvUbicacionOtro').value = '';
   document.getElementById('grpTvHabitacion').style.display = 'none';
   document.getElementById('tvHabitacion').value = '';
-  const grpTvTaller = document.getElementById('grpTvTallerEstado');
-  if (grpTvTaller) {
-    grpTvTaller.style.display = 'none';
-    document.getElementById('tvTallerEstado').value = 'inoperativo';
-  }
+  const grpRep = document.getElementById('grpReparacionInline');
+  if (grpRep) grpRep.style.display = 'none';
   
   renderMarcas();
   document.getElementById('tvMarca').value = '';
@@ -1680,12 +1654,26 @@ function resetFormTV() {
 document.getElementById('tvUbicacion').addEventListener('change', function() {
   document.getElementById('grpUbicacionOtro').style.display = this.value === 'otro' ? '' : 'none';
   document.getElementById('grpTvHabitacion').style.display = (this.value === 'Habitacion' || this.value === 'Habitación') ? '' : 'none';
-  const grpTvTaller = document.getElementById('grpTvTallerEstado');
-  if (grpTvTaller) {
-    grpTvTaller.style.display = this.value === 'Taller' ? '' : 'none';
-    if (this.value === 'Taller') {
-      document.getElementById('tvTallerEstado').value = 'inoperativo';
-    }
+});
+
+// Mostrar sección de reparación inline al cambiar inoperativo → operativo en Taller
+document.getElementById('tvEstado').addEventListener('change', function() {
+  const grpRep = document.getElementById('grpReparacionInline');
+  if (!grpRep) return;
+  const ubicacion = document.getElementById('tvUbicacion').value;
+  const esTaller = String(ubicacion || '').toLowerCase() === 'taller';
+  if (esTaller && this.value === 'operativo' && window._estadoOriginal === 'inoperativo') {
+    grpRep.style.display = '';
+    document.getElementById('reparacionTecnico').value = '';
+    document.getElementById('reparacionFecha').value = '';
+    const ahora = new Date();
+    const y = ahora.getFullYear();
+    const m = String(ahora.getMonth() + 1).padStart(2, '0');
+    const d = String(ahora.getDate()).padStart(2, '0');
+    document.getElementById('reparacionFecha').value = `${y}-${m}-${d}`;
+    document.getElementById('reparacionTecnico').focus();
+  } else {
+    grpRep.style.display = 'none';
   }
 });
 
@@ -1862,6 +1850,34 @@ function abrirModalSinTV() {
   openModal('modalSinTV');
 }
 
+// Abre el modal con el listado de TVs dados de baja
+function abrirModalBajas() {
+  const tvs = loadTVs().filter(t => t.estado === 'baja');
+  const body = document.getElementById('modalBajasBody');
+  if (!tvs.length) {
+    body.innerHTML = '<p style="color:var(--text-muted); text-align:center;">No hay TVs dados de baja.</p>';
+    openModal('modalBajas');
+    return;
+  }
+  const rows = tvs.map(t => `
+    <div class="mini-list-item" style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; margin-bottom:6px; background:rgba(255,77,109,0.08); border:1px solid rgba(255,77,109,0.2); border-radius:8px; cursor:pointer;" onclick="verDetalle('${t.id}')">
+      <div>
+        <div style="font-weight:700; font-size:0.95rem; color:var(--text-primary);">${t.codigo}</div>
+        <div style="font-size:0.78rem; color:var(--text-secondary);">${t.marca || ''} ${t.modelo || ''} ${t.pulgadas ? '| '+t.pulgadas+'"' : ''}</div>
+        <div style="font-size:0.72rem; color:var(--text-muted);">${t.fechaBaja ? 'Baja: '+t.fechaBaja : ''} ${t.motivoBaja ? '| '+t.motivoBaja : ''}</div>
+      </div>
+      <span style="font-size:0.7rem; padding:3px 10px; border-radius:12px; background:rgba(255,77,109,0.2); color:#ff4d6d; font-weight:600;">❌ Baja</span>
+    </div>
+  `).join('');
+  body.innerHTML = `
+    <div style="margin-bottom:0.8rem; padding:8px 14px; border-radius:8px; background:rgba(255,77,109,0.1); border:1px solid rgba(255,77,109,0.3); font-size:0.85rem;">
+      <strong style="color:#ff4d6d;">${tvs.length}</strong> TV${tvs.length > 1 ? 's' : ''} dado${tvs.length > 1 ? 's' : ''} de baja
+    </div>
+    ${rows}
+  `;
+  openModal('modalBajas');
+}
+
 // Abre el modal con el listado de TVs que están en el Taller
 function abrirModalTaller() {
   const tvs = loadTVs().filter(t => t.estado === 'taller' || String(t.ubicacion || '').toLowerCase() === 'taller');
@@ -1972,8 +1988,9 @@ function editarTV(id) {
   document.getElementById('tvId').value          = tv.id;
   document.getElementById('tvCodigo').value       = tv.codigo;
   
-  // Guardar estado original del taller para detectar cambio inoperativo→operativo
-  window._tallerEstadoOriginal = tv.tallerEstado || 'inoperativo';
+  // Guardar estado original para detectar cambio inoperativo→operativo
+  const _esTaller = String(tv.ubicacion || '').toLowerCase() === 'taller';
+  window._estadoOriginal = _esTaller ? (tv.tallerEstado || 'inoperativo') : (tv.estado || 'operativo');
   
   renderMarcas();
   document.getElementById('tvMarca').value        = tv.marca || '';
@@ -2008,12 +2025,6 @@ function editarTV(id) {
   const esHabitacion = tv.ubicacion === 'Habitacion' || tv.ubicacion === 'Habitación';
   document.getElementById('grpTvHabitacion').style.display = esHabitacion ? '' : 'none';
   document.getElementById('tvHabitacion').value = tv.habitacion || '';
-  const grpTvTaller = document.getElementById('grpTvTallerEstado');
-  if (grpTvTaller) {
-    const esTaller = String(tv.ubicacion || '').toLowerCase() === 'taller';
-    grpTvTaller.style.display = esTaller ? '' : 'none';
-    document.getElementById('tvTallerEstado').value = tv.tallerEstado || 'inoperativo';
-  }
   
   currentImgTrasera = tv.imgTrasera || '';
   currentImgFile = null;
@@ -2026,7 +2037,9 @@ function editarTV(id) {
     if (label) label.classList.remove('has-image');
   }
   
-  document.getElementById('tvEstado').value       = tv.estado || 'operativo';
+  // Si el TV está en Taller, mostrar tallerEstado en Estado Actual
+  const esTaller = String(tv.ubicacion || '').toLowerCase() === 'taller';
+  document.getElementById('tvEstado').value = esTaller ? (tv.tallerEstado || 'inoperativo') : (tv.estado || 'operativo');
   document.getElementById('tvObservaciones').value= tv.observaciones || '';
   document.getElementById('formTVTitle').textContent   = '✏️ Editar TV';
   document.getElementById('btnGuardarTV').textContent  = '💾 Actualizar TV';
@@ -2163,8 +2176,8 @@ document.getElementById('formTV').addEventListener('submit', e => {
     ubicacion:    ubicacionVal,
     habitacion:   (ubicacionVal === 'Habitacion' || ubicacionVal === 'Habitación') ? get('tvHabitacion') : '',
     imgTrasera:   currentImgTrasera,
-    estado:       get('tvEstado'),
-    tallerEstado: (String(ubicacionVal || '').toLowerCase() === 'taller') ? document.getElementById('tvTallerEstado').value : '',
+    estado:       (String(ubicacionVal || '').toLowerCase() === 'taller') ? 'taller' : get('tvEstado'),
+    tallerEstado: (String(ubicacionVal || '').toLowerCase() === 'taller') ? get('tvEstado') : '',
     observaciones:get('tvObservaciones'),
     updatedAt:    new Date().toISOString()
   };
@@ -2174,27 +2187,25 @@ document.getElementById('formTV').addEventListener('submit', e => {
   btnSubmit.textContent = 'Guardando...';
   btnSubmit.disabled = true;
 
-  // Detectar cambio inoperativo → operativo
-  const origTallerEstado = window._tallerEstadoOriginal || 'inoperativo';
-  const nuevoTallerEstado = tv.tallerEstado || '';
-  if (origTallerEstado === 'inoperativo' && nuevoTallerEstado === 'operativo') {
-    btnSubmit.textContent = prevText;
-    btnSubmit.disabled = false;
-
-    document.getElementById('reparacionTecnico').value = '';
-    document.getElementById('reparacionObs').value = '';
-    const ahora = new Date();
-    const y = ahora.getFullYear();
-    const m = String(ahora.getMonth() + 1).padStart(2, '0');
-    const d = String(ahora.getDate()).padStart(2, '0');
-    const hh = String(ahora.getHours()).padStart(2, '0');
-    const mm = String(ahora.getMinutes()).padStart(2, '0');
-    document.getElementById('reparacionFecha').value = `${y}-${m}-${d}T${hh}:${mm}`;
-    openModal('modalReparacion');
-    document.getElementById('reparacionTecnico').focus();
-
-    const reparado = await new Promise(resolve => { _reparacionResolve = resolve; });
-    if (!reparado) return;
+  // Detectar cambio inoperativo → operativo (validación inline)
+  const origEstado = window._estadoOriginal || 'operativo';
+  const nuevoEstado = get('tvEstado');
+  let _reparacionData = null;
+  if (origEstado === 'inoperativo' && nuevoEstado === 'operativo') {
+    const tecnico = document.getElementById('reparacionTecnico').value.trim();
+    const fecha = document.getElementById('reparacionFecha').value;
+    if (!tecnico) { showToast('Ingresa el nombre del técnico.', 'error'); document.getElementById('reparacionTecnico').focus(); btnSubmit.textContent = prevText; btnSubmit.disabled = false; return; }
+    if (!fecha) { showToast('Selecciona la fecha de reparación.', 'error'); document.getElementById('reparacionFecha').focus(); btnSubmit.textContent = prevText; btnSubmit.disabled = false; return; }
+    const fechaParts = fecha.split('-');
+    const fechaFmt = `${parseInt(fechaParts[2])}/${parseInt(fechaParts[1])}/${fechaParts[0]}`;
+    const obsReparacion = `[Reparado por ${tecnico} el ${fechaFmt}]`;
+    const obsField = document.getElementById('tvObservaciones');
+    const obsActual = obsField ? obsField.value.trim() : '';
+    if (obsField) {
+      obsField.value = obsActual ? obsActual + '\n' + obsReparacion : obsReparacion;
+    }
+    tv.observaciones = obsField ? obsField.value : '';
+    _reparacionData = { tecnico, fecha: fechaFmt };
   }
 
   try {
@@ -2208,6 +2219,26 @@ document.getElementById('formTV').addEventListener('submit', e => {
       codigo: tv.codigo,
       detalle: `${existId ? 'TV actualizado' : 'Nuevo TV registrado'}: ${tv.codigo} (${tv.marca || ''} ${tv.modelo || ''})`
     });
+
+    // Si hubo reparación (inoperativo→operativo), registrar movimiento en el historial del TV
+    if (_reparacionData) {
+      const movReparacion = {
+        id: uid(),
+        tvId: tv.id,
+        tipo: 'reparacion',
+        fecha: _reparacionData.fecha,
+        responsable: window.currentUser ? (window.currentUser.name || window.currentUser.email || 'Usuario') : 'Usuario',
+        motivo: `Reparación completada — Técnico: ${_reparacionData.tecnico}`,
+        origen: 'Taller',
+        destino: 'Taller',
+        habDestino: '',
+        tvReemplazo: null,
+        tvSaliente: '',
+        observaciones: `Reparado por ${_reparacionData.tecnico} el ${_reparacionData.fecha}`,
+        creadoEn: new Date().toISOString()
+      };
+      await db.collection('movimientos').doc(movReparacion.id).set(movReparacion);
+    }
 
     // Si el TV nuevo se registra directamente en el Taller, generar movimiento de envío a taller y su acta
     if (!existId && String(ubicacionVal || '').toLowerCase() === 'taller') {

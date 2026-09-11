@@ -72,6 +72,9 @@
         <button onclick="firebase.auth().signOut(); window.location.href='users.html';" style="width:100%; padding:6px; border:1px solid rgba(255,77,109,0.3); background:rgba(255,77,109,0.08); color:#ff4d6d; border-radius:6px; font-size:0.7rem; font-weight:600; cursor:pointer; font-family:inherit;">🚪 Cerrar Sesión</button>
       </div>
     </div>
+    <div style="text-align:center; padding:0.6rem; font-size:0.72rem; color:#ffffff; border-top:1px solid var(--border);">
+      Elaborado por José Luis Velásquez
+    </div>
   </aside>
 
   <!-- MAIN CONTENT -->
@@ -110,7 +113,7 @@
             <span class="stat-label">En Taller</span>
           </div>
         </div>
-        <div class="stat-card stat-baja">
+        <div class="stat-card stat-baja" tabindex="0" role="button" onclick="abrirModalBajas()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault(); abrirModalBajas();}" title="Ver TVs dados de baja" style="cursor:pointer;">
           <div class="stat-icon">❌</div>
           <div class="stat-info">
             <span class="stat-num" id="stat-baja">0</span>
@@ -224,12 +227,15 @@
         <div class="mov-panel-left">
 
           <!-- Encabezado del panel -->
-          <div class="mov-panel-header">
-            <span class="mov-panel-icon">📺</span>
-            <div>
-              <div class="mov-panel-title">Seleccionar TV para Movimiento</div>
-              <div class="mov-panel-sub">Busca y selecciona el televisor que deseas reubicar</div>
+          <div class="mov-panel-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+              <span class="mov-panel-icon">📺</span>
+              <div>
+                <div class="mov-panel-title">Seleccionar TV para Movimiento</div>
+                <div class="mov-panel-sub">Busca y selecciona el televisor que deseas reubicar</div>
+              </div>
             </div>
+            <button type="button" onclick="showPage('dashboard')" style="background:none; border:none; color:var(--text-secondary); font-size:1.4rem; cursor:pointer; padding:0.2rem 0.5rem; border-radius:6px; transition:all 0.2s;" onmouseover="this.style.color='#ff4d6d'; this.style.background='rgba(255,77,109,0.1)'" onmouseout="this.style.color='var(--text-secondary)'; this.style.background='none'" title="Salir">✕</button>
           </div>
 
           <!-- Selector de TV -->
@@ -501,8 +507,9 @@
     <section class="page" id="page-nuevo-tv">
       <div class="form-container">
         <div class="card">
-          <div class="card-header">
+          <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
             <h2 id="formTVTitle">📺 Registrar Nuevo TV</h2>
+            <button type="button" onclick="cancelarFormTV()" style="background:none; border:none; color:var(--text-secondary); font-size:1.4rem; cursor:pointer; padding:0.2rem 0.5rem; border-radius:6px; transition:all 0.2s;" onmouseover="this.style.color='#ff4d6d'; this.style.background='rgba(255,77,109,0.1)'" onmouseout="this.style.color='var(--text-secondary)'; this.style.background='none'" title="Salir">✕</button>
           </div>
           <div class="card-body">
             <form id="formTV" novalidate autocomplete="off">
@@ -636,13 +643,25 @@
                     </select>
                   </div>
 
-                  <div class="form-group form-group-col-4" id="grpTvTallerEstado" style="display: none;">
-                    <label for="tvTallerEstado">Condición en el Taller <span class="required">*</span></label>
-                    <select id="tvTallerEstado">
-                      <option value="inoperativo">Inoperativo</option>
-                      <option value="operativo">Operativo</option>
-                    </select>
+                  <!-- SECCIÓN REPARACIÓN INLINE (se muestra al cambiar inoperativo→operativo) -->
+                  <div id="grpReparacionInline" style="display:none; grid-column: 1 / -1; margin-top:0.8rem; padding:0.8rem 1rem; background:rgba(0,245,160,0.08); border:1px solid rgba(0,245,160,0.25); border-radius:8px;">
+                    <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.6rem;">
+                      <span style="font-size:1rem;">🔧</span>
+                      <strong style="color:#00f5a0; font-size:0.82rem;">REPARADO — Registra los datos de la reparación</strong>
+                    </div>
+                    <div style="display:flex; gap:0.8rem; align-items:flex-end;">
+                      <div style="flex:5; min-width:0;">
+                        <label style="font-size:0.78rem; font-weight:600; color:var(--text-primary);">👤 Técnico Responsable *</label>
+                        <input type="text" id="reparacionTecnico" placeholder="Nombre del técnico" maxlength="25" style="width:100%; padding:0.55rem; background:var(--bg-input); border:1px solid var(--border); color:var(--text-primary); border-radius:6px; margin-top:0.25rem; font-size:0.85rem; field-sizing: content;" />
+                      </div>
+                      <div style="flex:3; min-width:0;">
+                        <label style="font-size:0.78rem; font-weight:600; color:var(--text-primary);">📅 Fecha de Reparación *</label>
+                        <input type="date" id="reparacionFecha" style="width:100%; padding:0.55rem; background:var(--bg-input); border:1px solid var(--border); color:var(--text-primary); border-radius:6px; margin-top:0.25rem;" />
+                      </div>
+                    </div>
                   </div>
+
+
                 </div>
               </div>
 
@@ -698,8 +717,9 @@
     <section class="page" id="page-asignar-tv">
       <div class="form-container">
         <div class="card">
-          <div class="card-header">
+          <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
             <h2>📌 Asignar TV</h2>
+            <button type="button" onclick="showPage('inventario')" style="background:none; border:none; color:var(--text-secondary); font-size:1.4rem; cursor:pointer; padding:0.2rem 0.5rem; border-radius:6px; transition:all 0.2s;" onmouseover="this.style.color='#ff4d6d'; this.style.background='rgba(255,77,109,0.1)'" onmouseout="this.style.color='var(--text-secondary)'; this.style.background='none'" title="Salir">✕</button>
           </div>
           <div class="card-body">
             <p class="empty-state">Módulo para asignar televisores (en construcción).</p>
@@ -751,34 +771,6 @@
         <button class="modal-close" onclick="closeModal('modalHoraIncorrecta')">✕</button>
       </div>
       <div class="modal-body" id="modalHoraIncorrectaBody"></div>
-    </div>
-  </div>
-
-  <!-- MODAL: INFORMACIÓN DE REPARACIÓN -->
-  <div class="modal-overlay" id="modalReparacion" style="z-index: 9999;">
-    <div class="modal modal-sm">
-      <div class="modal-header" style="background:rgba(0,245,160,0.15); border-bottom-color:rgba(0,245,160,0.3);">
-        <h3 style="color:#00f5a0;">🔧 Registro de Reparación</h3>
-      </div>
-      <div class="modal-body">
-        <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:1rem;">El TV cambió de <strong style="color:#ff4d6d;">Inoperativo</strong> a <strong style="color:#00f5a0;">Operativo</strong>. Registra los datos de la reparación:</p>
-        <div style="margin-bottom:0.8rem;">
-          <label style="font-size:0.8rem; font-weight:600; color:var(--text-primary);">👤 Nombre del Técnico *</label>
-          <input type="text" id="reparacionTecnico" placeholder="Nombre del técnico que reparó" style="width:100%; padding:0.6rem; background:var(--bg-input); border:1px solid var(--border); color:var(--text-primary); border-radius:6px; margin-top:0.3rem;" />
-        </div>
-        <div style="margin-bottom:0.8rem;">
-          <label style="font-size:0.8rem; font-weight:600; color:var(--text-primary);">📅 Fecha de Reparación *</label>
-          <input type="datetime-local" id="reparacionFecha" style="width:100%; padding:0.6rem; background:var(--bg-input); border:1px solid var(--border); color:var(--text-primary); border-radius:6px; margin-top:0.3rem;" />
-        </div>
-        <div style="margin-bottom:0.8rem;">
-          <label style="font-size:0.8rem; font-weight:600; color:var(--text-primary);">📝 Observaciones</label>
-          <textarea id="reparacionObs" rows="2" placeholder="Detalle de la reparación realizada..." style="width:100%; padding:0.6rem; background:var(--bg-input); border:1px solid var(--border); color:var(--text-primary); border-radius:6px; margin-top:0.3rem; resize:vertical;"></textarea>
-        </div>
-        <div style="display:flex; gap:0.8rem; justify-content:flex-end;">
-          <button class="btn btn-outline btn-sm" onclick="cancelarReparacion()">Cancelar</button>
-          <button class="btn btn-primary btn-sm" onclick="confirmarReparacion()">✅ Guardar Reparación</button>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -1021,6 +1013,19 @@
           <button class="btn btn-secondary" onclick="closeModal('modalConfirmMov')">Cancelar</button>
           <button class="btn btn-danger" id="btnConfirmDeleteMov">Eliminar</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: TVs DADOS DE BAJA -->
+  <div class="modal-overlay" id="modalBajas">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>❌ TVs Dados de Baja</h3>
+        <button class="modal-close" onclick="closeModal('modalBajas')">✕</button>
+      </div>
+      <div class="modal-body" id="modalBajasBody">
+        <p style="color:var(--text-muted); text-align:center;">Cargando...</p>
       </div>
     </div>
   </div>

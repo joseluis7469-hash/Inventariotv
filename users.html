@@ -1617,23 +1617,54 @@
         if (movimientos.length === 0) {
           html += '<p style="color:var(--text-muted); text-align:center; padding:1rem;">No hay movimientos registrados.</p>';
         } else {
+          // Obtener datos de todos los TVs involucrados
+          const tvIds = [...new Set(movimientos.map(m => m.tvId).filter(Boolean))];
+          const tvMap = {};
+          for (const tvId of tvIds) {
+            try {
+              const tvDoc = await db.collection('tvs').doc(tvId).get();
+              if (tvDoc.exists) tvMap[tvId] = tvDoc.data();
+            } catch(e) {}
+          }
+
           html += `<div style="display:flex; flex-direction:column; gap:0.5rem;">`;
           movimientos.forEach(m => {
             const fecha = m.fechaMov || m.creadoEn || '';
             const fechaFmt = fecha ? new Date(fecha).toLocaleString('es-VE') : '—';
-            const tipoLabels = { traslado: '🏠 Traslado', entrada_taller: '🔧 Envío Taller', salida_taller: '🔄 Salida Taller', baja: '❌ Baja', otro: '📝 Otro' };
+            const tipoLabels = { 
+              traslado_hab: '🔀 Traslado', entrada_taller: '🔧 Envío Taller', 
+              retorno_taller: '🔄 Retorno Taller', reparacion: '✅ Reparado',
+              baja: '❌ Baja', otro: '📝 Otro',
+              tv_creado: '➕ TV Registrado', tv_editado: '✏️ TV Editado',
+              tv_asignado: '🏨 TV Asignado'
+            };
             const tipo = tipoLabels[m.tipo] || m.tipo || '—';
+            const tv = m.tvId ? tvMap[m.tvId] : null;
+            const serial = tv ? tv.serial : (m.tvSerial || '—');
+            const codigo = m.tvCodigo || tv?.codigo || '—';
+            const ubicacion = tv ? (tv.ubicacion || '—') : '—';
+            const habitacion = tv?.habitacion ? ` Hab. ${tv.habitacion}` : '';
+
+            let detalleExtra = '';
+            if (m.tipo === 'tv_editado' && m.motivo) {
+              detalleExtra = `<div style="font-size:0.78rem; color:var(--accent); margin-top:0.25rem;">${m.motivo}</div>`;
+            } else if (m.tipo === 'tv_creado') {
+              detalleExtra = `<div style="font-size:0.78rem; color:var(--text-muted); margin-top:0.25rem;">Serial: ${serial} | Ubicación: ${ubicacion}${habitacion}</div>`;
+            } else if (['traslado_hab','entrada_taller','otro','reparacion'].includes(m.tipo)) {
+              detalleExtra = `<div style="font-size:0.78rem; color:var(--text-muted); margin-top:0.25rem;"><strong>Origen:</strong> ${m.origen || '—'} → <strong>Destino:</strong> ${m.destino || '—'}</div>`;
+            }
+
             html += `<div style="padding:0.7rem; background:rgba(0,0,0,0.25); border-radius:8px; border:1px solid rgba(255,255,255,0.1);">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.3rem;">
                 <span style="font-size:0.85rem; font-weight:600; color:var(--accent);">${tipo}</span>
                 <span style="font-size:0.75rem; color:var(--text-muted);">${fechaFmt}</span>
               </div>
               <div style="font-size:0.8rem; color:var(--text-secondary);">
-                <strong>TV:</strong> ${m.tvCodigo || '—'} &nbsp;|&nbsp;
-                <strong>Origen:</strong> ${m.origen || '—'} &nbsp;→&nbsp;
-                <strong>Destino:</strong> ${m.destino || '—'}
+                <strong>TV:</strong> ${codigo} &nbsp;|&nbsp;
+                <strong>Serial:</strong> ${serial}
               </div>
-              ${m.motivo ? `<div style="font-size:0.78rem; color:var(--text-muted); margin-top:0.25rem;"><strong>Motivo:</strong> ${m.motivo}</div>` : ''}
+              ${detalleExtra}
+              ${m.motivo && m.tipo !== 'tv_editado' ? `<div style="font-size:0.78rem; color:var(--text-muted); margin-top:0.25rem;"><strong>Motivo:</strong> ${m.motivo}</div>` : ''}
             </div>`;
           });
           html += `</div>`;
